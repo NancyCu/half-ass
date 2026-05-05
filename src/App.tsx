@@ -5,6 +5,7 @@ import type { Workout } from './data/trainingPlan'
 import { useProgress } from './hooks/useProgress'
 import { useSettings } from './hooks/useSettings'
 import { Dashboard } from './pages/Dashboard'
+import { Month } from './pages/Month'
 import { Plan } from './pages/Plan'
 import { Progress } from './pages/Progress'
 import { Settings } from './pages/Settings'
@@ -25,6 +26,9 @@ function App() {
       ) : null}
       {screen === 'plan' ? (
         <Plan week1Start={settings.week1Start} progressApi={progressApi} onOpenWorkout={setSelectedWorkout} />
+      ) : null}
+      {screen === 'month' ? (
+        <Month week1Start={settings.week1Start} progressApi={progressApi} onOpenWorkout={setSelectedWorkout} />
       ) : null}
       {screen === 'zones' ? <Zones /> : null}
       {screen === 'library' ? <WorkoutLibrary /> : null}
