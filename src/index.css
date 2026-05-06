@@ -2400,8 +2400,17 @@ dd {
   background: rgba(255, 255, 255, 0.04);
 }
 
-.run-ledger-row strong,
-.run-ledger-row span {
+.run-ledger-open {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.run-ledger-open strong,
+.run-ledger-open span {
   display: block;
   min-width: 0;
   overflow: hidden;
@@ -2409,20 +2418,20 @@ dd {
   white-space: nowrap;
 }
 
-.run-ledger-row strong {
+.run-ledger-open strong {
   color: rgba(248, 251, 255, 0.92);
   font-size: 13px;
   font-weight: 900;
 }
 
-.run-ledger-row span {
+.run-ledger-open span {
   margin-top: 2px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 750;
 }
 
-.run-ledger-row button {
+.run-ledger-delete {
   width: 34px;
   height: 34px;
   display: grid;
@@ -2431,6 +2440,37 @@ dd {
   border-radius: 12px;
   color: #ff9ab3;
   background: rgba(255, 59, 112, 0.08);
+}
+
+.manual-run-detail-sheet {
+  gap: 14px;
+}
+
+.manual-run-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.manual-run-detail-grid span {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 15px;
+  padding: 11px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.manual-run-detail-grid small {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .dashboard-day-list {

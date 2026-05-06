@@ -18,6 +18,7 @@ export type ManualRunEntry = {
   date: string
   name: string
   distanceMiles: number
+  duration?: string
   durationMinutes?: number
   pace?: string
   averageHr?: number

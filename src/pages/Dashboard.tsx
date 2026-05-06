@@ -1,10 +1,10 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, X } from 'lucide-react'
 import { useState, type CSSProperties, type FormEvent } from 'react'
 import { ProgressSummary } from '../components/ProgressSummary'
 import { ZoneChips } from '../components/ZoneChips'
 import { allWorkouts, trainingPlan, type Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
-import type { useProgress } from '../hooks/useProgress'
+import type { ManualRunEntry, useProgress } from '../hooks/useProgress'
 import { getMonday, parseISODate, toISODate } from '../utils/dates'
 import { getCurrentWeek, getPlanTiming, getWorkoutForDate, workoutDateLabel } from '../utils/workouts'
 
@@ -26,6 +26,51 @@ function formatMiles(miles: number) {
 
 function formatRunDate(isoDate: string) {
   return new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(parseISODate(isoDate))
+}
+
+function isDurationInput(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return true
+  return /^\d+$/.test(trimmed) || /^\d{1,2}:\d{2}(?::\d{2})?$/.test(trimmed)
+}
+
+function formatDurationFromMinutes(minutes: number) {
+  if (!Number.isFinite(minutes)) return ''
+  const rounded = Math.round(minutes)
+  const seconds = rounded % 100
+  const front = Math.floor(rounded / 100)
+  if (rounded >= 100 && seconds < 60 && front > 0) {
+    return `${front}:${String(seconds).padStart(2, '0')}`
+  }
+  return `${rounded} min`
+}
+
+function formatRunDuration(run: ManualRunEntry) {
+  if (run.duration) return run.duration
+  if (run.durationMinutes) return formatDurationFromMinutes(run.durationMinutes)
+  return ''
+}
+
+function normalizeDurationInput(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  return trimmed.includes(':') ? trimmed : `${Number.parseInt(trimmed, 10)} min`
+}
+
+function normalizePaceInput(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  if (trimmed.includes('/') || trimmed.toLowerCase().includes('mph')) return trimmed
+  return `${trimmed}/mi`
+}
+
+function manualRunMeta(run: ManualRunEntry) {
+  const details = [`${formatRunDate(run.date)} · ${formatMiles(run.distanceMiles)} mi`]
+  const duration = formatRunDuration(run)
+  if (duration) details.push(duration)
+  if (run.pace) details.push(run.pace)
+  if (run.averageHr) details.push(`${run.averageHr} bpm`)
+  return details.join(' · ')
 }
 
 function isWithinRange(isoDate: string, startISO: string, endISO: string) {
@@ -68,6 +113,7 @@ export function Dashboard({
   const [manualRunTime, setManualRunTime] = useState('')
   const [manualRunPace, setManualRunPace] = useState('')
   const [manualRunHr, setManualRunHr] = useState('')
+  const [selectedManualRun, setSelectedManualRun] = useState<ManualRunEntry | null>(null)
   const todayWorkout = getWorkoutForDate(new Date(), week1Start)
   const today = todayWorkout ?? trainingPlan[0].days[0]
   const todayISO = toISODate(new Date())
@@ -115,21 +161,24 @@ export function Dashboard({
   const todayFlags = todayProgress?.flags ?? []
   const circumference = 2 * Math.PI * 42
   const ringOffset = circumference - (progressApi.summary.percentage / 100) * circumference
-  const manualRunError = manualRunDistance && Number.parseFloat(manualRunDistance) <= 0 ? 'Distance needs to be above 0.' : ''
+  const manualRunError = manualRunDistance && Number.parseFloat(manualRunDistance) <= 0
+    ? 'Distance needs to be above 0.'
+    : !isDurationInput(manualRunTime)
+      ? 'Use time like 8:49, 1:02:15, or plain minutes.'
+      : ''
 
   function addManualRun(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const distanceMiles = Number.parseFloat(manualRunDistance)
-    const durationMinutes = manualRunTime ? Number.parseFloat(manualRunTime) : undefined
     const averageHr = manualRunHr ? Math.round(Number.parseFloat(manualRunHr)) : undefined
-    if (!Number.isFinite(distanceMiles) || distanceMiles <= 0) return
+    if (!Number.isFinite(distanceMiles) || distanceMiles <= 0 || !isDurationInput(manualRunTime)) return
 
     progressApi.addManualRun({
       date: isWithinRange(manualRunDate, weekStartISO, todayISO) ? manualRunDate : todayISO,
       name: manualRunName.trim() || 'Run Ledger Entry',
       distanceMiles,
-      durationMinutes: durationMinutes && durationMinutes > 0 ? durationMinutes : undefined,
-      pace: manualRunPace.trim() || undefined,
+      duration: normalizeDurationInput(manualRunTime),
+      pace: normalizePaceInput(manualRunPace),
       averageHr: averageHr && averageHr > 0 ? averageHr : undefined,
     })
     setManualRunName('Run Ledger Entry')
@@ -326,10 +375,10 @@ export function Dashboard({
                 </label>
                 <label>
                   <span>Time</span>
-                  <input type="number" inputMode="decimal" min="1" step="1" placeholder="32" value={manualRunTime} onChange={(event) => setManualRunTime(event.target.value)} />
+                  <input inputMode="text" placeholder="8:49" value={manualRunTime} onChange={(event) => setManualRunTime(event.target.value)} aria-invalid={Boolean(manualRunError && !isDurationInput(manualRunTime))} />
                 </label>
                 <label>
-                  <span>Pace</span>
+                  <span>Pace (min/mi)</span>
                   <input inputMode="text" placeholder="9:45/mi" value={manualRunPace} onChange={(event) => setManualRunPace(event.target.value)} />
                 </label>
                 <label>
@@ -345,11 +394,11 @@ export function Dashboard({
             <div className="run-ledger-list">
               {manualRunsThisWeek.map((run) => (
                 <article className="run-ledger-row" key={run.id}>
-                  <div>
+                  <button className="run-ledger-open" type="button" onClick={() => setSelectedManualRun(run)}>
                     <strong>{run.name}</strong>
-                    <span>{formatRunDate(run.date)} · {formatMiles(run.distanceMiles)} mi{run.durationMinutes ? ` · ${run.durationMinutes} min` : ''}{run.pace ? ` · ${run.pace}` : ''}{run.averageHr ? ` · ${run.averageHr} bpm` : ''}</span>
-                  </div>
-                  <button type="button" onClick={() => progressApi.removeManualRun(run.id)} aria-label={`Remove ${run.name}`}>
+                    <span>{manualRunMeta(run)}</span>
+                  </button>
+                  <button className="run-ledger-delete" type="button" onClick={() => progressApi.removeManualRun(run.id)} aria-label={`Remove ${run.name}`}>
                     <Trash2 size={16} />
                   </button>
                 </article>
@@ -375,6 +424,35 @@ export function Dashboard({
           })}
         </div>
       </section>
+      {selectedManualRun ? (
+        <div className="sheet-backdrop" role="presentation" onClick={() => setSelectedManualRun(null)}>
+          <section className="detail-sheet manual-run-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="manual-run-detail-title" onClick={(event) => event.stopPropagation()}>
+            <button className="icon-button close-button" type="button" onClick={() => setSelectedManualRun(null)} aria-label="Close manual run details">
+              <X size={21} />
+            </button>
+            <p className="eyebrow">Run Ledger</p>
+            <h2 id="manual-run-detail-title">{selectedManualRun.name}</h2>
+            <div className="manual-run-detail-grid">
+              <span><small>Date</small>{formatRunDate(selectedManualRun.date)}</span>
+              <span><small>Distance</small>{formatMiles(selectedManualRun.distanceMiles)} mi</span>
+              <span><small>Time</small>{formatRunDuration(selectedManualRun) || '-'}</span>
+              <span><small>Pace</small>{selectedManualRun.pace ?? '-'}</span>
+              <span><small>Avg HR</small>{selectedManualRun.averageHr ? `${selectedManualRun.averageHr} bpm` : '-'}</span>
+              <span><small>Logged</small>{new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(selectedManualRun.createdAt))}</span>
+            </div>
+            <button
+              className="danger-button"
+              type="button"
+              onClick={() => {
+                progressApi.removeManualRun(selectedManualRun.id)
+                setSelectedManualRun(null)
+              }}
+            >
+              <Trash2 size={18} /> Delete entry
+            </button>
+          </section>
+        </div>
+      ) : null}
     </main>
   )
 }
