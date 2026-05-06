@@ -1,14 +1,12 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { ProgressSummary } from '../components/ProgressSummary'
 import { ZoneChips } from '../components/ZoneChips'
 import { allWorkouts, trainingPlan, type Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import type { useProgress } from '../hooks/useProgress'
-import { getCurrentWeek, getCurrentWeekNumber, getWorkoutForDate, workoutDate } from '../utils/workouts'
+import { getCurrentWeek, getCurrentWeekNumber, getWorkoutForDate } from '../utils/workouts'
 
 type ProgressApi = ReturnType<typeof useProgress>
-
-const easyDayTypes = ['foundation', 'recovery', 'long-run', 'long-speed-play', 'long-fast-finish']
 
 function workoutLoad(workout: Workout) {
   const durationMinutes = Number.parseFloat(workout.duration)
@@ -27,6 +25,16 @@ function isQualityWorkout(workout: Workout) {
   return !['foundation', 'recovery', 'rest'].includes(workout.type) && !isLongWorkout(workout)
 }
 
+function progressColor(percent: number) {
+  const clamped = Math.max(0, Math.min(100, percent)) / 100
+  const start = { r: 255, g: 59, b: 112 }
+  const end = { r: 66, g: 247, b: 155 }
+  const r = Math.round(start.r + (end.r - start.r) * clamped)
+  const g = Math.round(start.g + (end.g - start.g) * clamped)
+  const b = Math.round(start.b + (end.b - start.b) * clamped)
+  return `rgb(${r}, ${g}, ${b})`
+}
+
 export function Dashboard({
   week1Start,
   progressApi,
@@ -42,13 +50,13 @@ export function Dashboard({
   const currentWeek = getCurrentWeek(week1Start)
   const currentWeekNumber = getCurrentWeekNumber(week1Start)
   const activePhase = focusedPhase ?? currentWeek.phase
+  const todayLibrary = getWorkoutLibraryEntry(today.type)
   const todayProgress = progressApi.progress.workouts[today.id]
   const weeklyDone = currentWeek.days.filter((workout) => progressApi.progress.workouts[workout.id]?.status === 'completed').length
   const weeklyMiles = estimatedWeekMiles(currentWeek.days)
   const weeklyLongRun = currentWeek.days.find((workout) => isLongWorkout(workout))
   const weeklyQuality = currentWeek.days.filter((workout) => isQualityWorkout(workout)).length
-  const todayDate = workoutDate(today, week1Start)
-  const compactDate = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(todayDate)
+  const compactDate = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())
   const completedWorkouts = allWorkouts.filter((workout) => progressApi.progress.workouts[workout.id]?.status === 'completed')
   const completedLoad = completedWorkouts.reduce((total, workout) => total + workoutLoad(workout), 0)
   const plannedLoad = allWorkouts.reduce((total, workout) => total + workoutLoad(workout), 0)
@@ -72,7 +80,6 @@ export function Dashboard({
   const selectedWeek = drillWeek ? trainingPlan.find((week) => week.week === drillWeek) : null
   const activePhaseWeeks = phaseGroups[activePhase] ?? phaseGroups[currentWeek.phase] ?? []
   const distanceOrDuration = today.miles ? `${today.miles} mi` : today.duration
-  const isEasyDay = easyDayTypes.includes(today.type)
   const todayNote = todayProgress?.note?.trim()
   const todayFlags = todayProgress?.flags ?? []
   const circumference = 2 * Math.PI * 42
@@ -87,7 +94,11 @@ export function Dashboard({
           <strong>{compactDate}</strong>
           <span>Week {currentWeekNumber} · {currentWeek.phase}</span>
         </div>
-        <div className="dashboard-ring" aria-label={`${progressApi.summary.percentage}% complete`}>
+        <div
+          className="dashboard-ring"
+          style={{ '--progress-tone': progressColor(progressApi.summary.percentage) } as CSSProperties}
+          aria-label={`${progressApi.summary.percentage}% complete`}
+        >
           <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
             <circle cx="50" cy="50" r="42" />
             <circle cx="50" cy="50" r="42" style={{ strokeDasharray: circumference, strokeDashoffset: ringOffset }} />
@@ -96,7 +107,7 @@ export function Dashboard({
           <span>done</span>
         </div>
       </header>
-      <ProgressSummary summary={progressApi.summary} currentWeek={currentWeekNumber} />
+      <ProgressSummary summary={progressApi.summary} currentWeek={currentWeekNumber} currentWeekTone={todayLibrary.color} />
       <section className="dashboard-analytics-panel">
         <div className="analytics-panel-header">
           <div>
@@ -204,7 +215,6 @@ export function Dashboard({
           <span>{distanceOrDuration}</span>
           <span>{today.targetBpm}</span>
         </span>
-        {isEasyDay ? <span className="compact-warning">Easy day: stay under 143 bpm</span> : null}
         {todayNote || todayFlags.length ? (
           <span className="workout-tile-notes compact">
             {todayNote ? <span>{todayNote}</span> : null}

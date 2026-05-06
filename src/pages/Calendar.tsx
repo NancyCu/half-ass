@@ -113,6 +113,7 @@ export function Calendar({
   const currentBlock = Math.floor((currentWeek - 1) / 4)
   const [mode, setMode] = useState<CalendarMode>('month')
   const [visibleMonth, setVisibleMonth] = useState(() => new Date())
+  const [selectedRoadmapWeek, setSelectedRoadmapWeek] = useState<WeekPlan | null>(null)
 
   const monthDays = useMemo(() => buildMonthDays(visibleMonth, week1Start), [visibleMonth, week1Start])
   const monthWorkouts = useMemo(
@@ -150,9 +151,9 @@ export function Calendar({
       </header>
 
       <div className="segmented-control sticky-control calendar-view-control" role="group" aria-label="Calendar layout">
-        <button className={mode === 'week' ? 'selected' : ''} type="button" onClick={() => setMode('week')}>Week</button>
-        <button className={mode === 'month' ? 'selected' : ''} type="button" onClick={() => setMode('month')}>Month</button>
-        <button className={mode === 'block' ? 'selected' : ''} type="button" onClick={() => setMode('block')}>4-week</button>
+        <button className={mode === 'week' ? 'selected' : ''} type="button" onClick={() => { setSelectedRoadmapWeek(null); setMode('week') }}>Week</button>
+        <button className={mode === 'month' ? 'selected' : ''} type="button" onClick={() => { setSelectedRoadmapWeek(null); setMode('month') }}>Month</button>
+        <button className={mode === 'block' ? 'selected' : ''} type="button" onClick={() => { setSelectedRoadmapWeek(null); setMode('block') }}>4-week</button>
         <button className={mode === 'full' ? 'selected' : ''} type="button" onClick={() => setMode('full')}>Full</button>
       </div>
 
@@ -286,29 +287,38 @@ export function Calendar({
         <section className="roadmap-list" aria-label="Full 15-week training roadmap">
           <div className="month-section-heading">
             <p className="eyebrow">Program roadmap</p>
-            <h2>15 weeks at a glance</h2>
+            <h2>{selectedRoadmapWeek ? `Week ${selectedRoadmapWeek.week} details` : '15 weeks at a glance'}</h2>
           </div>
-          {trainingPlan.map((week) => {
+          {selectedRoadmapWeek ? (
+            <div className="roadmap-detail-flow">
+              <button className="secondary-button roadmap-back-button" type="button" onClick={() => setSelectedRoadmapWeek(null)}>
+                <ChevronLeft size={18} aria-hidden="true" /> Back to 15 weeks
+              </button>
+              <WeekCard week={selectedRoadmapWeek} week1Start={week1Start} progress={progressApi.progress} onOpenWorkout={onOpenWorkout} />
+            </div>
+          ) : trainingPlan.map((week) => {
             const keyRun = keyWorkout(week)
             const completed = completedCount(week, progressApi)
             return (
               <section className={`roadmap-week-card ${phaseClass(week)} ${week.week === currentWeek ? 'current-week' : ''}`} key={week.week}>
-                <div>
-                  <p className="eyebrow">{week.phase}</p>
-                  <h2>Week {week.week}</h2>
-                </div>
-                <div className="roadmap-meter" aria-label={`${completed} of 7 workouts done`}>
-                  {week.days.map((workout) => {
-                    const library = getWorkoutLibraryEntry(workout.type)
-                    const status = progressApi.progress.workouts[workout.id]?.status
-                    return <span className={`${library.color} ${status ?? ''}`} key={workout.id} />
-                  })}
-                </div>
-                <div className="roadmap-facts">
-                  <span><small>Miles</small><strong>{weekMiles(week)}</strong></span>
-                  <span><small>Key run</small><strong>{keyRun.name}</strong></span>
-                  <span><small>Target</small><strong>{keyRun.miles ? `${keyRun.miles} mi` : keyRun.duration}</strong></span>
-                </div>
+                <button className="roadmap-week-drill" type="button" onClick={() => setSelectedRoadmapWeek(week)}>
+                  <span>
+                    <p className="eyebrow">{week.phase}</p>
+                    <h2>Week {week.week}</h2>
+                  </span>
+                  <span className="roadmap-meter" aria-label={`${completed} of 7 workouts done`}>
+                    {week.days.map((workout) => {
+                      const library = getWorkoutLibraryEntry(workout.type)
+                      const status = progressApi.progress.workouts[workout.id]?.status
+                      return <i className={`${library.color} ${status ?? ''}`} key={workout.id} />
+                    })}
+                  </span>
+                  <span className="roadmap-facts">
+                    <span><small>Miles</small><strong>{weekMiles(week)}</strong></span>
+                    <span><small>Key run</small><strong>{keyRun.name}</strong></span>
+                    <span><small>Target</small><strong>{keyRun.miles ? `${keyRun.miles} mi` : keyRun.duration}</strong></span>
+                  </span>
+                </button>
                 <button className="secondary-button roadmap-open-button" type="button" onClick={() => onOpenWorkout(keyRun)}>
                   Open key run
                 </button>
