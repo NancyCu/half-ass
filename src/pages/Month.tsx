@@ -115,10 +115,7 @@ export function Month({
                 <span className="month-date-number">{day.date.getDate()}</span>
                 {workout ? (
                   <>
-                    <span className="month-day-type">{library?.name}</span>
-                    <strong>{workout.miles ? `${workout.miles} mi` : workout.duration}</strong>
-                    <em>{workout.targetBpm}</em>
-                    <small>{workout.zone}</small>
+                    <strong className="month-workout-name">{workout.name}</strong>
                     {status ? <span className="month-status-dot" aria-label={status} /> : null}
                   </>
                 ) : (
