@@ -2,62 +2,118 @@
 
 ## Purpose
 
-This app is a mobile-first 15-week 80/20 half marathon training PWA. It prioritizes today’s workout, effort targets, pace targets, Garmin copy support, and simple local progress tracking.
+Half_Ass_Training is a mobile-first 15-week 80/20 half marathon training PWA. It answers what workout is planned today, how hard it should be, what HR/pace zone to target, and how the user is progressing through the plan.
+
+It should act as the training plan/calendar layer in the broader running system, not the main activity database.
 
 ## Runtime Shape
 
-- Frontend: Vite, React, TypeScript, plain CSS.
+- Frontend: Vite, React 19, TypeScript, plain CSS, lucide-react.
 - Backend: none.
 - Database: none.
 - Auth: none.
-- Deployment: static build output in `dist/`.
+- Deployment: static build output in `dist/`, with Firebase static hosting config present.
 - Local/dev commands:
   - `npm run dev`
   - `npm run lint`
   - `npm run build`
   - `npm run preview`
 
-## Main Screens
+## Main Routes / Screens / APIs
 
-- Dashboard: today’s workout, targets, steps, Garmin helpers, notes, flags, weekly count.
-- Plan: full plan, 4-week block view, and current-week view using large cards.
-- Zones: updated HR/pace zones and black-hole warning.
-- Workout Library: definitions, targets, and common mistakes.
-- Progress: completed/skipped/modified workouts, notes, current week, percentages, longest run, last workout.
-- Settings: Week 1 start date, race alignment, theme, import/export, reset.
+There are no backend API routes.
+
+Screens are controlled by `src/App.tsx` and `src/components/BottomNav.tsx`:
+
+- Dashboard: `src/pages/Dashboard.tsx`
+- Calendar: `src/pages/Calendar.tsx`
+- Zones: `src/pages/Zones.tsx`
+- Workout Library: `src/pages/WorkoutLibrary.tsx`
+- Progress: `src/pages/Progress.tsx`
+- Settings: `src/pages/Settings.tsx`
+
+Important components:
+
+- Today workout card: `src/components/TodayWorkoutCard.tsx`
+- Week cards: `src/components/WeekCard.tsx`
+- Workout cards: `src/components/WorkoutCard.tsx`
+- Workout detail sheet: `src/components/WorkoutDetailSheet.tsx`
+- Garmin copy/open helper: `src/components/GarminCopyButton.tsx`
+- Progress summary: `src/components/ProgressSummary.tsx`
+- Theme toggle: `src/components/ThemeToggle.tsx`
+- Zone display: `src/components/ZoneCard.tsx`, `src/components/ZoneChips.tsx`
 
 ## Data Contracts
 
-- `Workout` in `src/data/trainingPlan.ts` includes `name`, `week`, `day`, `duration`, optional `miles`, `type`, `targetBpm`, `targetPace`, `zone`, `steps`, and `notes`.
-- `WorkoutLibraryEntry` in `src/data/workoutLibrary.ts` controls type color, definition, BPM, pace, and mistake-to-avoid copy.
-- `Zone` in `src/data/zones.ts` controls zone cards and target helper text.
-- Progress storage key: `half_ass_training_progress_v1`.
-- Settings storage key: `half_ass_training_settings_v1`.
-- PWA files: `public/manifest.webmanifest`, `public/sw.js`, `public/pwa-icon.svg`.
+- `Workout` in `src/data/trainingPlan.ts`:
+  - `id`
+  - `week`
+  - `day`
+  - `dayName`
+  - `name`
+  - `duration`
+  - optional `miles`
+  - `type`
+  - `targetBpm`
+  - `targetPace`
+  - `zone`
+  - `steps`
+  - `notes`
+  - `phase`
+  - optional `weekLabel`
+- `WeekPlan` in `src/data/trainingPlan.ts`.
+- `WorkoutType` and `WorkoutLibraryEntry` in `src/data/workoutLibrary.ts`.
+- `Zone` and `zoneTargets` in `src/data/zones.ts`.
+- `WorkoutProgress`, `ManualRunEntry`, and `ProgressState` in `src/hooks/useProgress.ts`.
+- `SettingsState` and `ThemeMode` in `src/hooks/useSettings.ts`.
+
+Storage keys:
+
+- `half_ass_training_progress_v1`
+- `half_ass_training_settings_v1`
+
+PWA/static files:
+
+- `index.html`
+- `public/manifest.webmanifest`
+- `public/sw.js`
+- `public/pwa-icon.svg`
+- `public/icons.svg`
 
 ## Core Workflows
 
-- Open the app and see today’s workout from the configured Week 1 start.
-- Mark a workout complete, skipped, or modified.
-- Add/edit notes and pain/fatigue flags.
-- Tap workout cards to open the detail sheet.
+- Open the Dashboard and see today’s planned workout from the configured Week 1 start.
+- View the 15-week plan by calendar/month, current week, 4-week block, or roadmap-style views.
+- Open a workout detail sheet from Dashboard, Calendar, or Progress.
+- Mark workouts completed, skipped, or modified.
+- Add/edit workout notes.
+- Toggle pain/fatigue flags.
+- Add manual run entries from Dashboard.
 - Copy workout details for Garmin Connect.
 - Open Garmin Connect workouts in a new tab.
-- Switch between dark neon and print-friendly light themes.
+- Review zones and workout-library definitions.
+- Adjust Week 1 start date or align it from race date in Settings.
+- Switch dark/print theme.
 - Export/import local progress JSON.
-- Align Week 1 to a race date.
+- Reset settings and progress with confirmation.
 
 ## Current Limitations
 
-- Data is local to the browser and device.
-- Garmin integration is manual copy/open, not an API sync.
-- The service worker uses a simple app-shell cache.
-- No automated tests are present beyond lint/build verification.
+- Data is local to the browser/device.
+- No backend, auth, cloud sync, or StrideSync connection.
+- Garmin integration is manual copy/open only.
+- Planned workouts are not linked to real Strava/Garmin activities yet.
+- No automated tests beyond lint/build.
+- Service worker is simple app-shell behavior.
 
 ## High-Risk Surfaces
 
-- Date math in `src/utils/dates.ts` and `src/utils/workouts.ts`.
-- Training data completeness in `src/data/trainingPlan.ts`.
-- LocalStorage migration/compatibility in `src/hooks/useProgress.ts` and `src/hooks/useSettings.ts`.
-- Mobile layout and bottom navigation safe-area behavior in `src/index.css`.
-- PWA installability files under `public/`.
+- `src/data/trainingPlan.ts`: canonical workout names, numbering, phases, weeks, steps, and target values.
+- `src/data/workoutLibrary.ts` and `src/data/zones.ts`: workout definitions and target helpers.
+- `src/hooks/useProgress.ts`: localStorage schema, progress import/export, manual runs.
+- `src/hooks/useSettings.ts`: Week 1 start, race alignment, theme persistence.
+- `src/utils/dates.ts` and `src/utils/workouts.ts`: date math, today workout selection, copy text.
+- `src/pages/Dashboard.tsx` and `src/pages/Calendar.tsx`: primary planning surfaces.
+- `src/components/WorkoutDetailSheet.tsx`: status, notes, flags, segments, Garmin helper.
+- `src/index.css`: mobile layout, bottom nav safe areas, print theme.
+- `public/` PWA assets.
