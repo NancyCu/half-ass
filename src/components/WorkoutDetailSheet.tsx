@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import type { Workout } from '../data/trainingPlan'
 import type { PainFlag, WorkoutStatus } from '../hooks/useProgress'
 import { GarminCopyButton } from './GarminCopyButton'
+import { ZoneChips } from './ZoneChips'
 
 const flags: PainFlag[] = ['Good', 'Tired', 'Hip tight', 'Ankle tight', 'HR too high']
 const flagLabels: Record<PainFlag, string> = {
@@ -47,7 +48,7 @@ export function WorkoutDetailSheet({
           <span><small>Time / Distance</small>{workout.miles ? `${workout.miles} mi` : workout.duration}</span>
           <span><small>Target HR</small>{workout.targetBpm}</span>
           <span><small>Target Pace</small>{workout.targetPace}</span>
-          <span><small>Zones</small>{workout.zone}</span>
+          <span><small>Zones</small><ZoneChips zones={workout.zone} /></span>
         </div>
         <ol className="step-list">
           {workout.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}

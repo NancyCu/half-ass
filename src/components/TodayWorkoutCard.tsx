@@ -2,6 +2,7 @@ import type { Workout } from '../data/trainingPlan'
 import type { PainFlag, WorkoutStatus } from '../hooks/useProgress'
 import { GarminCopyButton } from './GarminCopyButton'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
+import { ZoneChips } from './ZoneChips'
 
 const flags: PainFlag[] = ['Good', 'Tired', 'Hip tight', 'Ankle tight', 'HR too high']
 const flagLabels: Record<PainFlag, string> = {
@@ -53,7 +54,7 @@ export function TodayWorkoutCard({
         <div><span>Time / Distance</span><strong>{distanceOrDuration}</strong></div>
         <div><span>Target HR</span><strong>{workout.targetBpm}</strong></div>
         <div><span>Target Pace</span><strong>{workout.targetPace}</strong></div>
-        <div><span>Zones</span><strong>{workout.zone}</strong></div>
+        <div><span>Zones</span><strong><ZoneChips zones={workout.zone} /></strong></div>
       </div>
       {isEasyDay ? <div className="warning-banner">Stay under 143 bpm</div> : null}
       <ol className="step-list">

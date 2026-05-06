@@ -1,11 +1,10 @@
-import { Activity, BarChart3, CalendarDays, CalendarRange, Dumbbell, Gauge, Settings } from 'lucide-react'
+import { Activity, BarChart3, CalendarRange, Dumbbell, Gauge, Settings } from 'lucide-react'
 
-export type Screen = 'dashboard' | 'plan' | 'month' | 'zones' | 'library' | 'progress' | 'settings'
+export type Screen = 'dashboard' | 'calendar' | 'zones' | 'library' | 'progress' | 'settings'
 
 const items = [
   { id: 'dashboard', label: 'Dash', icon: Activity },
-  { id: 'plan', label: 'Plan', icon: CalendarDays },
-  { id: 'month', label: 'Month', icon: CalendarRange },
+  { id: 'calendar', label: 'Calendar', icon: CalendarRange },
   { id: 'zones', label: 'Zones', icon: Gauge },
   { id: 'library', label: 'Library', icon: Dumbbell },
   { id: 'progress', label: 'Progress', icon: BarChart3 },

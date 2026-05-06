@@ -1,6 +1,7 @@
 import type { Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import { workoutDateLabel } from '../utils/workouts'
+import { ZoneChips } from './ZoneChips'
 
 export function WorkoutCard({
   workout,
@@ -24,7 +25,7 @@ export function WorkoutCard({
         <span><small>Time / Distance</small>{distanceOrDuration}</span>
         <span><small>Target HR</small>{workout.targetBpm}</span>
         <span><small>Target Pace</small>{workout.targetPace}</span>
-        <span><small>Zones</small>{workout.zone}</span>
+        <span><small>Zones</small><ZoneChips zones={workout.zone} /></span>
       </span>
       <span className="steps-preview">{workout.steps.slice(0, 2).join(' · ')}</span>
       {status ? <span className={`status-pill ${status}`}>{status}</span> : null}
