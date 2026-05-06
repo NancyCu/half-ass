@@ -58,8 +58,28 @@ function phaseClass(week: WeekPlan) {
   return 'base-week'
 }
 
+const timedRunPaceEstimate: Partial<Record<Workout['type'], number>> = {
+  foundation: 11.1,
+  recovery: 12.5,
+  'fast-finish': 10.3,
+  tempo: 9.6,
+  cruise: 9.6,
+  hills: 10.8,
+  'short-interval': 10.6,
+  'long-interval': 9.8,
+  'mixed-interval': 9.4,
+}
+
+function estimatedWorkoutMiles(workout: Workout) {
+  if (workout.miles) return workout.miles
+
+  const minutes = Number.parseInt(workout.duration, 10)
+  const pace = timedRunPaceEstimate[workout.type]
+  return Number.isFinite(minutes) && pace ? minutes / pace : 0
+}
+
 function weekMiles(week: WeekPlan) {
-  return week.days.reduce((sum, workout) => sum + (workout.miles ?? 0), 0)
+  return Math.round(week.days.reduce((sum, workout) => sum + estimatedWorkoutMiles(workout), 0))
 }
 
 function keyWorkout(week: WeekPlan) {
