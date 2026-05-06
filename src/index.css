@@ -1337,7 +1337,12 @@ input:focus {
 .calendar-block-card.race-week,
 .roadmap-week-card.race-week { border-color: rgba(255, 209, 92, 0.72); box-shadow: var(--shadow), 0 0 34px rgba(255, 209, 92, 0.2); }
 
-.block-summary-strip,
+.block-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
 .roadmap-facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2287,6 +2292,145 @@ dd {
   background:
     radial-gradient(circle at 8% 8%, rgba(23, 231, 255, 0.14), transparent 12rem),
     linear-gradient(145deg, rgba(22, 34, 59, 0.94), rgba(7, 10, 21, 0.9));
+}
+
+.run-ledger {
+  display: grid;
+  gap: 9px;
+  border: 1px solid rgba(66, 247, 155, 0.24);
+  border-radius: 17px;
+  padding: 10px;
+  background:
+    linear-gradient(135deg, rgba(66, 247, 155, 0.09), rgba(255, 255, 255, 0.025)),
+    rgba(0, 0, 0, 0.12);
+}
+
+.run-ledger-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.run-ledger-header strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.1;
+  font-weight: 950;
+}
+
+.run-ledger-toggle {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border-color: rgba(66, 247, 155, 0.36);
+  color: var(--green);
+  background: rgba(66, 247, 155, 0.09);
+}
+
+.manual-run-form {
+  display: grid;
+  gap: 9px;
+}
+
+.manual-run-form label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.manual-run-form input {
+  min-height: 43px;
+  border-radius: 13px;
+  padding: 10px 11px;
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.manual-run-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.manual-run-grid label:first-child {
+  grid-column: 1 / -1;
+}
+
+.manual-run-form .primary-button {
+  min-height: 42px;
+  padding-block: 9px;
+}
+
+.form-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.form-hint.danger {
+  color: #ff9ab3;
+}
+
+.run-ledger-list {
+  display: grid;
+  gap: 7px;
+}
+
+.run-ledger-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.run-ledger-row strong,
+.run-ledger-row span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-ledger-row strong {
+  color: rgba(248, 251, 255, 0.92);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.run-ledger-row span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.run-ledger-row button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 59, 112, 0.32);
+  border-radius: 12px;
+  color: #ff9ab3;
+  background: rgba(255, 59, 112, 0.08);
 }
 
 .dashboard-day-list {

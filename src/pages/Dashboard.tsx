@@ -1,9 +1,11 @@
-import { useState, type CSSProperties } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
+import { useState, type CSSProperties, type FormEvent } from 'react'
 import { ProgressSummary } from '../components/ProgressSummary'
 import { ZoneChips } from '../components/ZoneChips'
 import { allWorkouts, trainingPlan, type Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import type { useProgress } from '../hooks/useProgress'
+import { getMonday, parseISODate, toISODate } from '../utils/dates'
 import { getCurrentWeek, getPlanTiming, getWorkoutForDate, workoutDateLabel } from '../utils/workouts'
 
 type ProgressApi = ReturnType<typeof useProgress>
@@ -15,6 +17,19 @@ function workoutLoad(workout: Workout) {
 
 function estimatedWeekMiles(workouts: Workout[]) {
   return Math.round(workouts.reduce((total, workout) => total + workoutLoad(workout), 0))
+}
+
+function formatMiles(miles: number) {
+  if (!Number.isFinite(miles)) return '0'
+  return miles.toFixed(miles % 1 === 0 ? 0 : 1)
+}
+
+function formatRunDate(isoDate: string) {
+  return new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(parseISODate(isoDate))
+}
+
+function isWithinRange(isoDate: string, startISO: string, endISO: string) {
+  return isoDate >= startISO && isoDate <= endISO
 }
 
 function isLongWorkout(workout: Workout) {
@@ -46,8 +61,17 @@ export function Dashboard({
 }) {
   const [drillWeek, setDrillWeek] = useState<number | null>(null)
   const [focusedPhase, setFocusedPhase] = useState<string | null>(null)
+  const [isManualRunOpen, setIsManualRunOpen] = useState(false)
+  const [manualRunName, setManualRunName] = useState('Run Ledger Entry')
+  const [manualRunDate, setManualRunDate] = useState(() => toISODate(new Date()))
+  const [manualRunDistance, setManualRunDistance] = useState('')
+  const [manualRunTime, setManualRunTime] = useState('')
+  const [manualRunPace, setManualRunPace] = useState('')
+  const [manualRunHr, setManualRunHr] = useState('')
   const todayWorkout = getWorkoutForDate(new Date(), week1Start)
   const today = todayWorkout ?? trainingPlan[0].days[0]
+  const todayISO = toISODate(new Date())
+  const weekStartISO = toISODate(getMonday(new Date()))
   const isWorkoutToday = Boolean(todayWorkout)
   const currentWeek = getCurrentWeek(week1Start)
   const planTiming = getPlanTiming(week1Start)
@@ -67,8 +91,11 @@ export function Dashboard({
   const completedWeekLoad = currentWeek.days
     .filter((workout) => progressApi.progress.workouts[workout.id]?.status === 'completed')
     .reduce((total, workout) => total + workoutLoad(workout), 0)
+  const manualRunsThisWeek = (progressApi.progress.manualRuns ?? []).filter((run) => isWithinRange(run.date, weekStartISO, todayISO))
+  const manualWeekMiles = manualRunsThisWeek.reduce((total, run) => total + run.distanceMiles, 0)
+  const loggedWeekMiles = completedWeekLoad + manualWeekMiles
   const loadPercent = plannedLoad > 0 ? Math.round((completedLoad / plannedLoad) * 100) : 0
-  const weeklyLoadPercent = currentWeekLoad > 0 ? Math.round((completedWeekLoad / currentWeekLoad) * 100) : 0
+  const weeklyLoadPercent = currentWeekLoad > 0 ? Math.round((loggedWeekMiles / currentWeekLoad) * 100) : 0
   const statusCounts = {
     completed: progressApi.summary.completed,
     modified: progressApi.summary.modified,
@@ -88,6 +115,31 @@ export function Dashboard({
   const todayFlags = todayProgress?.flags ?? []
   const circumference = 2 * Math.PI * 42
   const ringOffset = circumference - (progressApi.summary.percentage / 100) * circumference
+  const manualRunError = manualRunDistance && Number.parseFloat(manualRunDistance) <= 0 ? 'Distance needs to be above 0.' : ''
+
+  function addManualRun(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const distanceMiles = Number.parseFloat(manualRunDistance)
+    const durationMinutes = manualRunTime ? Number.parseFloat(manualRunTime) : undefined
+    const averageHr = manualRunHr ? Math.round(Number.parseFloat(manualRunHr)) : undefined
+    if (!Number.isFinite(distanceMiles) || distanceMiles <= 0) return
+
+    progressApi.addManualRun({
+      date: isWithinRange(manualRunDate, weekStartISO, todayISO) ? manualRunDate : todayISO,
+      name: manualRunName.trim() || 'Run Ledger Entry',
+      distanceMiles,
+      durationMinutes: durationMinutes && durationMinutes > 0 ? durationMinutes : undefined,
+      pace: manualRunPace.trim() || undefined,
+      averageHr: averageHr && averageHr > 0 ? averageHr : undefined,
+    })
+    setManualRunName('Run Ledger Entry')
+    setManualRunDate(todayISO)
+    setManualRunDistance('')
+    setManualRunTime('')
+    setManualRunPace('')
+    setManualRunHr('')
+    setIsManualRunOpen(false)
+  }
 
   return (
     <main className="screen">
@@ -130,7 +182,7 @@ export function Dashboard({
           <div>
             <span>Weekly load</span>
             <strong>{weeklyLoadPercent}%</strong>
-            <div className="progress-track" aria-hidden="true"><span style={{ width: `${weeklyLoadPercent}%` }} /></div>
+            <div className="progress-track" aria-hidden="true"><span style={{ width: `${Math.min(weeklyLoadPercent, 100)}%` }} /></div>
           </div>
           <div>
             <span>Plan load</span>
@@ -242,10 +294,69 @@ export function Dashboard({
           <span className="mini-progress">{weeklyDone}/7 done</span>
         </div>
         <div className="block-summary-strip" aria-label={`Week ${currentWeek.week} summary`}>
-          <span><small>Miles</small><strong>{weeklyMiles}</strong></span>
+          <span><small>Logged</small><strong>{formatMiles(loggedWeekMiles)} mi</strong></span>
+          <span><small>Planned</small><strong>{weeklyMiles} mi</strong></span>
           <span><small>Long run</small><strong>{weeklyLongRun?.miles ?? 0} mi</strong></span>
           <span><small>Quality</small><strong>{weeklyQuality}</strong></span>
         </div>
+        <section className="run-ledger" aria-label="Run Ledger manual entries">
+          <div className="run-ledger-header">
+            <div>
+              <p className="eyebrow">Run Ledger</p>
+              <strong>{formatMiles(manualWeekMiles)} manual mi this week</strong>
+            </div>
+            <button className="icon-button run-ledger-toggle" type="button" onClick={() => setIsManualRunOpen((open) => !open)} aria-label={isManualRunOpen ? 'Close manual run form' : 'Add manual run'}>
+              <Plus size={19} />
+            </button>
+          </div>
+          {isManualRunOpen ? (
+            <form className="manual-run-form" onSubmit={addManualRun}>
+              <label>
+                <span>Run name</span>
+                <input value={manualRunName} onChange={(event) => setManualRunName(event.target.value)} />
+              </label>
+              <div className="manual-run-grid">
+                <label>
+                  <span>Date</span>
+                  <input type="date" min={weekStartISO} max={todayISO} value={manualRunDate} onChange={(event) => setManualRunDate(event.target.value)} />
+                </label>
+                <label>
+                  <span>Distance</span>
+                  <input type="number" inputMode="decimal" min="0.01" step="0.01" placeholder="3.25" value={manualRunDistance} onChange={(event) => setManualRunDistance(event.target.value)} required />
+                </label>
+                <label>
+                  <span>Time</span>
+                  <input type="number" inputMode="decimal" min="1" step="1" placeholder="32" value={manualRunTime} onChange={(event) => setManualRunTime(event.target.value)} />
+                </label>
+                <label>
+                  <span>Pace</span>
+                  <input inputMode="text" placeholder="9:45/mi" value={manualRunPace} onChange={(event) => setManualRunPace(event.target.value)} />
+                </label>
+                <label>
+                  <span>Avg HR</span>
+                  <input type="number" inputMode="numeric" min="40" max="230" step="1" placeholder="142" value={manualRunHr} onChange={(event) => setManualRunHr(event.target.value)} />
+                </label>
+              </div>
+              {manualRunError ? <p className="form-hint danger">{manualRunError}</p> : <p className="form-hint">Counts toward logged miles from Monday through today.</p>}
+              <button className="primary-button" type="submit">Add run</button>
+            </form>
+          ) : null}
+          {manualRunsThisWeek.length ? (
+            <div className="run-ledger-list">
+              {manualRunsThisWeek.map((run) => (
+                <article className="run-ledger-row" key={run.id}>
+                  <div>
+                    <strong>{run.name}</strong>
+                    <span>{formatRunDate(run.date)} · {formatMiles(run.distanceMiles)} mi{run.durationMinutes ? ` · ${run.durationMinutes} min` : ''}{run.pace ? ` · ${run.pace}` : ''}{run.averageHr ? ` · ${run.averageHr} bpm` : ''}</span>
+                  </div>
+                  <button type="button" onClick={() => progressApi.removeManualRun(run.id)} aria-label={`Remove ${run.name}`}>
+                    <Trash2 size={16} />
+                  </button>
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </section>
         <div className="dashboard-day-list">
           {currentWeek.days.map((workout) => {
             const status = progressApi.progress.workouts[workout.id]?.status

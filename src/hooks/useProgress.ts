@@ -13,18 +13,33 @@ export type WorkoutProgress = {
   updatedAt?: string
 }
 
-export type ProgressState = {
-  workouts: Record<string, WorkoutProgress>
+export type ManualRunEntry = {
+  id: string
+  date: string
+  name: string
+  distanceMiles: number
+  durationMinutes?: number
+  pace?: string
+  averageHr?: number
+  createdAt: string
 }
 
-const initialProgress: ProgressState = { workouts: {} }
+export type ProgressState = {
+  workouts: Record<string, WorkoutProgress>
+  manualRuns: ManualRunEntry[]
+}
+
+const initialProgress: ProgressState = { workouts: {}, manualRuns: [] }
 
 function readProgress(): ProgressState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return initialProgress
     const parsed = JSON.parse(raw) as ProgressState
-    return { workouts: parsed.workouts ?? {} }
+    return {
+      workouts: parsed.workouts ?? {},
+      manualRuns: Array.isArray(parsed.manualRuns) ? parsed.manualRuns : [],
+    }
   } catch {
     return initialProgress
   }
@@ -42,6 +57,7 @@ export function useProgress() {
 
   function updateWorkout(id: string, patch: WorkoutProgress) {
     setProgress((current) => ({
+      ...current,
       workouts: {
         ...current.workouts,
         [id]: {
@@ -68,12 +84,36 @@ export function useProgress() {
     })
   }
 
+  function addManualRun(entry: Omit<ManualRunEntry, 'id' | 'createdAt'>) {
+    setProgress((current) => ({
+      ...current,
+      manualRuns: [
+        {
+          ...entry,
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+        },
+        ...(current.manualRuns ?? []),
+      ],
+    }))
+  }
+
+  function removeManualRun(id: string) {
+    setProgress((current) => ({
+      ...current,
+      manualRuns: (current.manualRuns ?? []).filter((run) => run.id !== id),
+    }))
+  }
+
   function resetProgress() {
     setProgress(initialProgress)
   }
 
   function importProgress(next: ProgressState) {
-    setProgress({ workouts: next.workouts ?? {} })
+    setProgress({
+      workouts: next.workouts ?? {},
+      manualRuns: Array.isArray(next.manualRuns) ? next.manualRuns : [],
+    })
   }
 
   const summary = useMemo(() => {
@@ -105,6 +145,8 @@ export function useProgress() {
     setStatus,
     setNote,
     toggleFlag,
+    addManualRun,
+    removeManualRun,
     resetProgress,
     importProgress,
   }
