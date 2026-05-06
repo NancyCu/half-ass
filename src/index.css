@@ -234,6 +234,8 @@ h2 {
 
 .today-card,
 .week-card,
+.calendar-block-card,
+.roadmap-week-card,
 .zone-card,
 .library-card,
 .month-panel,
@@ -252,6 +254,8 @@ h2 {
 
 :root[data-theme='print'] .today-card,
 :root[data-theme='print'] .week-card,
+:root[data-theme='print'] .calendar-block-card,
+:root[data-theme='print'] .roadmap-week-card,
 :root[data-theme='print'] .zone-card,
 :root[data-theme='print'] .library-card,
 :root[data-theme='print'] .month-panel,
@@ -374,7 +378,7 @@ h2 {
     linear-gradient(160deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025));
 }
 
-.target-strip span,
+.target-strip div > span,
 .threshold-panel span,
 .stat-card p,
 dt,
@@ -592,6 +596,10 @@ input:focus {
 
 .segmented-control button {
   flex: 1 0 auto;
+}
+
+.calendar-view-control button {
+  min-width: 72px;
 }
 
 .sticky-control {
@@ -894,7 +902,7 @@ input:focus {
   gap: 7px;
 }
 
-.agenda-meta span {
+.agenda-meta > span {
   min-width: 0;
   overflow: hidden;
   padding: 8px;
@@ -990,7 +998,7 @@ input:focus {
   gap: 7px;
 }
 
-.meta-grid span {
+.meta-grid > span {
   min-width: 0;
   display: grid;
   gap: 3px;
@@ -1010,6 +1018,219 @@ input:focus {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.zone-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.zone-chip-row.compact {
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
+.zone-chip {
+  min-width: 31px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--zone-tone) 72%, rgba(255, 255, 255, 0.18));
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: #031014;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--zone-tone) 92%, #fff 8%), color-mix(in srgb, var(--zone-tone) 70%, #031014 14%));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--zone-tone) 34%, transparent);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.zone-chip-row.compact .zone-chip {
+  min-width: 25px;
+  padding: 3px 5px;
+  font-size: 10px;
+}
+
+.zone-chip-z1 { --zone-tone: var(--green); }
+.zone-chip-z2 { --zone-tone: var(--cyan); }
+.zone-chip-z3 { --zone-tone: var(--gold); }
+.zone-chip-z4 { --zone-tone: var(--orange); }
+.zone-chip-z5 { --zone-tone: var(--magenta); color: #fff; }
+
+.calendar-block-list,
+.roadmap-list {
+  display: grid;
+  gap: 12px;
+}
+
+.calendar-block-card,
+.roadmap-week-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.calendar-block-card.base-week,
+.roadmap-week-card.base-week { border-color: rgba(23, 231, 255, 0.22); }
+.calendar-block-card.peak-week,
+.roadmap-week-card.peak-week { border-color: rgba(255, 63, 211, 0.32); box-shadow: var(--shadow), var(--shadow-neon-magenta); }
+.calendar-block-card.recovery-week,
+.roadmap-week-card.recovery-week { border-color: rgba(66, 247, 155, 0.38); background: linear-gradient(145deg, rgba(66, 247, 155, 0.1), rgba(7, 10, 21, 0.9)); }
+.calendar-block-card.taper-week,
+.roadmap-week-card.taper-week { border-color: rgba(143, 92, 255, 0.36); }
+.calendar-block-card.race-week,
+.roadmap-week-card.race-week { border-color: rgba(255, 209, 92, 0.72); box-shadow: var(--shadow), 0 0 34px rgba(255, 209, 92, 0.2); }
+
+.block-summary-strip,
+.roadmap-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.block-summary-strip span,
+.roadmap-facts span {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.block-summary-strip small,
+.roadmap-facts small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.block-summary-strip strong,
+.roadmap-facts strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.block-day-list {
+  display: grid;
+  gap: 7px;
+}
+
+.block-day-row {
+  --tone: var(--cyan);
+  position: relative;
+  min-width: 0;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto auto 10px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 4px solid var(--tone);
+  border-radius: 15px;
+  padding: 8px;
+  color: var(--text);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--tone) 12%, transparent), transparent 44%),
+    rgba(255, 255, 255, 0.045);
+  text-align: left;
+}
+
+.block-day-row.cyan,
+.roadmap-meter span.cyan { --tone: var(--cyan); }
+.block-day-row.green,
+.roadmap-meter span.green { --tone: var(--green); }
+.block-day-row.purple,
+.roadmap-meter span.purple { --tone: var(--magenta); }
+.block-day-row.orange,
+.roadmap-meter span.orange { --tone: var(--orange); }
+.block-day-row.gold,
+.roadmap-meter span.gold,
+.block-day-row.race,
+.roadmap-meter span.race { --tone: var(--gold); }
+.block-day-row.gray,
+.roadmap-meter span.gray { --tone: var(--gray); }
+
+.block-day-date {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.block-day-row > strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.block-day-row > span:not(.block-day-date, .zone-chip-row) {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--gray);
+}
+
+.status-dot.completed { background: var(--green); box-shadow: 0 0 12px rgba(66, 247, 155, 0.62); }
+.status-dot.modified { background: var(--gold); }
+.status-dot.skipped { background: var(--gray); opacity: 0.72; }
+
+.roadmap-week-card {
+  border-left: 5px solid rgba(23, 231, 255, 0.5);
+}
+
+.roadmap-week-card.current-week {
+  border-color: rgba(23, 231, 255, 0.78);
+  box-shadow: var(--shadow), var(--shadow-neon-cyan);
+}
+
+.roadmap-meter {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.roadmap-meter span {
+  min-height: 13px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tone) 62%, rgba(255, 255, 255, 0.08));
+  opacity: 0.55;
+}
+
+.roadmap-meter span.completed {
+  opacity: 1;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--tone) 42%, transparent);
+}
+
+.roadmap-open-button {
+  min-height: 42px;
+  flex: 0 0 auto;
 }
 
 .steps-preview,
@@ -1204,7 +1425,7 @@ dd {
   left: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
   width: 100%;
   max-width: 520px;
