@@ -234,6 +234,9 @@ h2 {
 
 .today-card,
 .week-card,
+.dashboard-command-center,
+.dashboard-analytics-panel,
+.dashboard-week-strip,
 .calendar-block-card,
 .roadmap-week-card,
 .zone-card,
@@ -254,6 +257,9 @@ h2 {
 
 :root[data-theme='print'] .today-card,
 :root[data-theme='print'] .week-card,
+:root[data-theme='print'] .dashboard-command-center,
+:root[data-theme='print'] .dashboard-analytics-panel,
+:root[data-theme='print'] .dashboard-week-strip,
 :root[data-theme='print'] .calendar-block-card,
 :root[data-theme='print'] .roadmap-week-card,
 :root[data-theme='print'] .zone-card,
@@ -323,6 +329,117 @@ h2 {
 .today-card > :not(.hero-stripe) {
   position: relative;
   z-index: 1;
+}
+
+.dashboard-command-center {
+  position: relative;
+  min-height: 168px;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #020716;
+}
+
+.dashboard-command-center::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(2, 7, 22, 0.44), transparent 30%, transparent 70%, rgba(2, 7, 22, 0.42)),
+    linear-gradient(180deg, rgba(2, 7, 22, 0.08), rgba(2, 7, 22, 0.44));
+  pointer-events: none;
+}
+
+.dashboard-command-center > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-banner-art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.dashboard-banner-status {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: grid;
+  gap: 3px;
+  max-width: min(55%, 260px);
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(3, 8, 24, 0.62);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(8px);
+}
+
+.dashboard-banner-status strong {
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.dashboard-banner-status span {
+  color: rgba(248, 251, 255, 0.78);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.dashboard-ring {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(3, 8, 24, 0.5);
+  backdrop-filter: blur(5px);
+}
+
+.dashboard-ring svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.dashboard-ring circle {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 9;
+}
+
+.dashboard-ring circle + circle {
+  stroke: var(--cyan);
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 10px rgba(23, 231, 255, 0.7));
+}
+
+.dashboard-ring strong {
+  color: var(--text);
+  font-size: 1.05rem;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.dashboard-ring span {
+  margin-top: 22px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .dashboard-topline,
@@ -1377,6 +1494,618 @@ dd {
 
 .progress-panel {
   gap: 12px;
+}
+
+.dashboard-analytics-panel,
+.dashboard-week-strip {
+  display: grid;
+  gap: 13px;
+  padding: 14px;
+}
+
+.analytics-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.analytics-progress-stack {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.analytics-progress-stack > div {
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.analytics-progress-stack span,
+.workout-tile-meta small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.analytics-progress-stack strong {
+  display: block;
+  margin: 8px 0;
+  color: var(--text);
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--cyan), var(--green));
+  box-shadow: 0 0 16px rgba(23, 231, 255, 0.42);
+}
+
+.progress-track.magenta span {
+  background: linear-gradient(90deg, var(--magenta), var(--gold));
+  box-shadow: 0 0 16px rgba(255, 49, 214, 0.32);
+}
+
+.phase-drilldown {
+  display: grid;
+  gap: 9px;
+}
+
+.phase-chart-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025)),
+    repeating-linear-gradient(0deg, transparent 0 27px, rgba(255, 255, 255, 0.04) 28px);
+}
+
+.phase-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.phase-card-header h3 {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.phase-card-header > span,
+.chart-back-button,
+.phase-focus-button {
+  flex: 0 0 auto;
+  border: 1px solid rgba(23, 231, 255, 0.36);
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--text);
+  background: rgba(23, 231, 255, 0.1);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.chart-back-button,
+.phase-focus-button {
+  min-height: 34px;
+}
+
+.phase-focus-button {
+  width: 100%;
+  border-radius: 14px;
+}
+
+.chart-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.phase-week-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.phase-week-tile,
+.day-drill-bar {
+  min-width: 0;
+  border: 0;
+  color: var(--muted);
+  text-align: left;
+}
+
+.phase-week-tile {
+  display: grid;
+  gap: 5px;
+  min-height: 52px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.phase-week-tile.current {
+  border-color: rgba(255, 49, 214, 0.48);
+  background:
+    radial-gradient(circle at 94% 10%, rgba(255, 49, 214, 0.24), transparent 4rem),
+    rgba(255, 255, 255, 0.055);
+}
+
+.phase-week-tile span {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.phase-week-tile strong {
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.phase-week-tile i {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.phase-week-tile em {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--cyan), var(--green));
+  box-shadow: 0 0 14px rgba(23, 231, 255, 0.3);
+}
+
+.day-drill-bar {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  gap: 6px;
+  align-items: end;
+  padding: 0;
+  background: transparent;
+}
+
+.day-drill-bar i {
+  display: block;
+  min-height: 10px;
+  width: 100%;
+  border-radius: 999px 999px 7px 7px;
+  background: linear-gradient(180deg, rgba(23, 231, 255, 0.95), rgba(66, 247, 155, 0.62));
+  box-shadow: 0 0 14px rgba(23, 231, 255, 0.22);
+}
+
+.day-drill-bar small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 950;
+  text-align: center;
+}
+
+.drill-card {
+  border-color: rgba(23, 231, 255, 0.34);
+}
+
+.day-drill-chart {
+  height: 142px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: 7px;
+}
+
+.day-drill-bar.completed i {
+  background: linear-gradient(180deg, var(--green), rgba(66, 247, 155, 0.58));
+}
+
+.day-drill-bar.modified i {
+  background: linear-gradient(180deg, var(--gold), rgba(255, 209, 92, 0.48));
+}
+
+.day-drill-bar.skipped i {
+  background: linear-gradient(180deg, var(--gray), rgba(142, 155, 176, 0.38));
+}
+
+.day-drill-bar span {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(248, 251, 255, 0.82);
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1.05;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-distribution {
+  display: flex;
+  min-height: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.status-distribution span {
+  min-width: 44px;
+  display: grid;
+  place-items: center;
+  padding: 5px 7px;
+  color: #031014;
+  font-size: 9px;
+  font-weight: 950;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.status-distribution .completed {
+  background: #39ff88;
+  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.2), 0 0 18px rgba(57, 255, 136, 0.22);
+}
+
+.status-distribution .modified {
+  background: #f8ff3d;
+  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.2), 0 0 18px rgba(248, 255, 61, 0.2);
+}
+
+.status-distribution .skipped {
+  color: #031014;
+  background: #2df7ff;
+  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.18), 0 0 18px rgba(45, 247, 255, 0.18);
+}
+
+.status-distribution .upcoming {
+  color: var(--text);
+  background: #283142;
+  box-shadow: inset 0 0 14px rgba(255, 255, 255, 0.06);
+}
+
+.dashboard-workout-tile {
+  position: relative;
+  display: grid;
+  gap: 9px;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(23, 231, 255, 0.28);
+  border-left: 5px solid var(--cyan);
+  border-radius: 20px;
+  padding: 13px 14px;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 92% 14%, rgba(23, 231, 255, 0.2), transparent 8rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.035));
+  text-align: left;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+}
+
+.dashboard-workout-tile::after {
+  content: "";
+  position: absolute;
+  right: -42px;
+  bottom: 18px;
+  width: 126px;
+  height: 38px;
+  opacity: 0.2;
+  background: repeating-linear-gradient(90deg, var(--cyan) 0 3px, transparent 3px 11px);
+  transform: rotate(-18deg);
+}
+
+.dashboard-workout-tile > * {
+  position: relative;
+  z-index: 1;
+}
+
+.workout-tile-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.workout-tile-topline em {
+  flex: 0 0 auto;
+  color: var(--cyan);
+  font-style: normal;
+  font-weight: 900;
+}
+
+.dashboard-workout-tile > strong {
+  display: block;
+  color: var(--text);
+  font-size: clamp(1.45rem, 7vw, 2rem);
+  line-height: 1.05;
+  font-weight: 950;
+  text-align: center;
+  text-shadow: 0 0 22px rgba(23, 231, 255, 0.18);
+}
+
+.workout-tile-quick-facts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  justify-self: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.workout-tile-quick-facts > span {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.compact-warning,
+.workout-tile-steps,
+.workout-tile-notes {
+  border-radius: 14px;
+  padding: 8px 10px;
+  color: rgba(248, 251, 255, 0.88);
+  background: rgba(255, 255, 255, 0.055);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.compact-warning {
+  border: 1px solid rgba(255, 59, 112, 0.38);
+  color: #fff;
+  background: linear-gradient(135deg, rgba(255, 59, 112, 0.36), rgba(255, 106, 42, 0.18));
+}
+
+.workout-tile-notes {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+}
+
+.workout-tile-notes.compact {
+  justify-items: center;
+  text-align: center;
+}
+
+.week-mini-grid {
+  display: grid;
+  gap: 7px;
+}
+
+.week-mini-day {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  padding: 8px 10px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.045);
+  text-align: left;
+}
+
+.week-mini-day span {
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.week-mini-day strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.week-mini-day.completed {
+  border-color: rgba(66, 247, 155, 0.42);
+  background: rgba(66, 247, 155, 0.11);
+}
+
+.week-mini-day.modified {
+  border-color: rgba(255, 209, 92, 0.42);
+  background: rgba(255, 209, 92, 0.1);
+}
+
+.week-mini-day.skipped {
+  opacity: 0.74;
+}
+
+.lively-week-card {
+  border-color: rgba(23, 231, 255, 0.38);
+  background:
+    radial-gradient(circle at 8% 8%, rgba(23, 231, 255, 0.14), transparent 12rem),
+    linear-gradient(145deg, rgba(22, 34, 59, 0.94), rgba(7, 10, 21, 0.9));
+}
+
+.dashboard-day-list {
+  display: grid;
+  gap: 7px;
+}
+
+.dashboard-day-row {
+  --tone: var(--cyan);
+  position: relative;
+  min-width: 0;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto auto auto 10px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--tone) 32%, rgba(255, 255, 255, 0.11));
+  border-left: 5px solid var(--tone);
+  border-radius: 16px;
+  padding: 9px;
+  color: var(--text);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--tone) 18%, transparent), transparent 46%),
+    rgba(255, 255, 255, 0.05);
+  text-align: left;
+}
+
+.dashboard-day-row::after {
+  content: "";
+  position: absolute;
+  right: -22px;
+  bottom: 8px;
+  width: 64px;
+  height: 18px;
+  opacity: 0.18;
+  background: repeating-linear-gradient(90deg, var(--tone) 0 3px, transparent 3px 8px);
+  transform: rotate(-18deg);
+}
+
+.dashboard-day-row.cyan { --tone: var(--cyan); }
+.dashboard-day-row.green { --tone: var(--green); }
+.dashboard-day-row.purple { --tone: var(--magenta); }
+.dashboard-day-row.orange { --tone: var(--orange); }
+.dashboard-day-row.gold,
+.dashboard-day-row.race { --tone: var(--gold); }
+.dashboard-day-row.gray { --tone: var(--gray); }
+
+.dashboard-day-row.completed {
+  background:
+    linear-gradient(135deg, rgba(66, 247, 155, 0.18), transparent 46%),
+    rgba(255, 255, 255, 0.05);
+}
+
+.dashboard-day-row.modified {
+  border-color: rgba(255, 209, 92, 0.42);
+}
+
+.dashboard-day-row.skipped {
+  opacity: 0.76;
+}
+
+.dashboard-day-row.today-workout {
+  border: 2px solid color-mix(in srgb, var(--tone) 72%, #ffffff 28%);
+  border-left-width: 8px;
+  background:
+    radial-gradient(circle at 82% 50%, color-mix(in srgb, var(--tone) 26%, transparent), transparent 9rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--tone) 26%, transparent), rgba(255, 255, 255, 0.08) 48%, rgba(255, 255, 255, 0.045));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--tone) 20%, transparent),
+    0 0 28px color-mix(in srgb, var(--tone) 34%, transparent),
+    inset 0 0 22px rgba(255, 255, 255, 0.05);
+  animation: todayWorkoutPulse 1.9s ease-in-out infinite;
+}
+
+.dashboard-day-row.today-workout::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid color-mix(in srgb, var(--tone) 48%, transparent);
+  border-radius: 12px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.today-workout-badge {
+  align-self: center;
+  border: 1px solid color-mix(in srgb, var(--tone) 62%, #ffffff 18%);
+  border-radius: 999px;
+  padding: 5px 7px;
+  color: #031014;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tone) 88%, #ffffff 12%), #ffffff);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--tone) 42%, transparent);
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+@keyframes todayWorkoutPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--tone) 18%, transparent),
+      0 0 18px color-mix(in srgb, var(--tone) 24%, transparent),
+      inset 0 0 18px rgba(255, 255, 255, 0.04);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--tone) 30%, transparent),
+      0 0 38px color-mix(in srgb, var(--tone) 46%, transparent),
+      inset 0 0 28px rgba(255, 255, 255, 0.08);
+    transform: translateY(-1px);
+  }
+}
+
+.dashboard-day-row > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-day-date {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.dashboard-day-row > strong {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(248, 251, 255, 0.94);
+  font-size: 13px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-day-duration {
+  color: rgba(166, 183, 207, 0.96);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .log-row {
