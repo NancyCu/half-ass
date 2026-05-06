@@ -4,7 +4,7 @@ import { ZoneChips } from '../components/ZoneChips'
 import { allWorkouts, trainingPlan, type Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import type { useProgress } from '../hooks/useProgress'
-import { getCurrentWeek, getCurrentWeekNumber, getWorkoutForDate, workoutDateLabel } from '../utils/workouts'
+import { getCurrentWeek, getPlanTiming, getWorkoutForDate, workoutDateLabel } from '../utils/workouts'
 
 type ProgressApi = ReturnType<typeof useProgress>
 
@@ -50,7 +50,8 @@ export function Dashboard({
   const today = todayWorkout ?? trainingPlan[0].days[0]
   const isWorkoutToday = Boolean(todayWorkout)
   const currentWeek = getCurrentWeek(week1Start)
-  const currentWeekNumber = getCurrentWeekNumber(week1Start)
+  const planTiming = getPlanTiming(week1Start)
+  const activeWeekNumber = planTiming.state === 'active' ? planTiming.weekNumber : null
   const activePhase = focusedPhase ?? currentWeek.phase
   const todayLibrary = getWorkoutLibraryEntry(today.type)
   const todayProgress = progressApi.progress.workouts[today.id]
@@ -95,7 +96,7 @@ export function Dashboard({
         <div className="dashboard-banner-status">
           <p className="eyebrow">Training dashboard</p>
           <strong>{compactDate}</strong>
-          <span>Week {currentWeekNumber} · {currentWeek.phase}</span>
+          <span>{planTiming.headerText}</span>
         </div>
         <div
           className="dashboard-ring"
@@ -110,7 +111,13 @@ export function Dashboard({
           <span>done</span>
         </div>
       </header>
-      <ProgressSummary summary={progressApi.summary} currentWeek={currentWeekNumber} currentWeekTone={todayLibrary.color} />
+      <ProgressSummary
+        summary={progressApi.summary}
+        currentWeek={planTiming.summaryValue}
+        currentWeekLabel={planTiming.summaryLabel}
+        currentWeekTone={planTiming.state === 'active' ? todayLibrary.color : 'gray'}
+        currentWeekActive={planTiming.state === 'active'}
+      />
       <section className="dashboard-analytics-panel">
         <div className="analytics-panel-header">
           <div>
@@ -190,7 +197,7 @@ export function Dashboard({
                   const weekDone = week.days.filter((workout) => progressApi.progress.workouts[workout.id]?.status === 'completed').length
                   const weekPercent = Math.round((weekDone / 7) * 100)
                   return (
-                    <button className={week.week === currentWeekNumber ? 'phase-week-tile current' : 'phase-week-tile'} key={week.week} type="button" onClick={() => setDrillWeek(week.week)}>
+                    <button className={week.week === activeWeekNumber ? 'phase-week-tile current' : 'phase-week-tile'} key={week.week} type="button" onClick={() => setDrillWeek(week.week)}>
                       <span>Week {week.week}</span>
                       <strong>{weekDone}/7</strong>
                       <i aria-hidden="true"><em style={{ width: `${weekPercent}%` }} /></i>
@@ -208,7 +215,7 @@ export function Dashboard({
           <span className="upcoming" style={{ flexGrow: Math.max(upcomingCount, 0.25) }}>Upcoming {upcomingCount}</span>
         </div>
       </section>
-      <button className="dashboard-workout-tile" type="button" onClick={() => onOpenWorkout(today)}>
+      <button className={`dashboard-workout-tile ${todayLibrary.color}`} type="button" onClick={() => onOpenWorkout(today)}>
         <span className="workout-tile-topline">
           <span>{workoutTileLabel}</span>
           {todayProgress?.status ? <em className={`status-pill ${todayProgress.status}`}>{todayProgress.status}</em> : <em>Tap for details</em>}
@@ -218,6 +225,7 @@ export function Dashboard({
           <span>{distanceOrDuration}</span>
           <span>{today.targetBpm}</span>
         </span>
+        <span className="workout-tile-goal">{todayLibrary.what}</span>
         {todayNote || todayFlags.length ? (
           <span className="workout-tile-notes compact">
             {todayNote ? <span>{todayNote}</span> : null}

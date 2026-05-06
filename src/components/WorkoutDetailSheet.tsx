@@ -1,6 +1,8 @@
+import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import type { Workout } from '../data/trainingPlan'
 import type { PainFlag, WorkoutStatus } from '../hooks/useProgress'
+import { getWorkoutSegments } from '../utils/workouts'
 import { GarminCopyButton } from './GarminCopyButton'
 import { ZoneChips } from './ZoneChips'
 
@@ -34,7 +36,56 @@ export function WorkoutDetailSheet({
   onNote: (note: string) => void
   onToggleFlag: (flag: PainFlag) => void
 }) {
+  const [introIndex, setIntroIndex] = useState<number | null>(null)
+  const [introDone, setIntroDone] = useState(false)
+  const [selectedSegment, setSelectedSegment] = useState<number | null>(null)
+
+  const segments = useMemo(() => (workout ? getWorkoutSegments(workout) : []), [workout])
+
+  useEffect(() => {
+    const reset = window.setTimeout(() => {
+      setSelectedSegment(null)
+      setIntroIndex(segments.length > 0 ? 0 : null)
+      setIntroDone(segments.length === 0)
+    }, 0)
+
+    if (!workout || segments.length === 0) {
+      return () => window.clearTimeout(reset)
+    }
+
+    let nextIndex = 0
+    const interval = window.setInterval(() => {
+      nextIndex += 1
+      if (nextIndex >= segments.length) {
+        window.clearInterval(interval)
+        setIntroIndex(null)
+        setIntroDone(true)
+        return
+      }
+      setIntroIndex(nextIndex)
+    }, 2000)
+
+    return () => {
+      window.clearTimeout(reset)
+      window.clearInterval(interval)
+    }
+  }, [workout, segments.length])
+
+  useEffect(() => {
+    if (selectedSegment === null) return
+
+    const timeout = window.setTimeout(() => setSelectedSegment(null), 10000)
+    return () => window.clearTimeout(timeout)
+  }, [selectedSegment])
+
   if (!workout) return null
+
+  const activeSegmentIndex = selectedSegment ?? introIndex
+  const activeSegment = activeSegmentIndex === null ? null : segments[activeSegmentIndex]
+  const displayedTargetBpm = activeSegment?.targetBpm ?? workout.targetBpm
+  const displayedTargetPace = activeSegment?.targetPace ?? workout.targetPace
+  const zoneClass = (zone: string) => zone.match(/Z[1-5]/)?.[0].toLowerCase() ?? 'z2'
+  const activeTargetClass = activeSegment ? `target-sync active ${zoneClass(activeSegment.zone)}` : 'target-sync'
 
   return (
     <div className="sheet-backdrop" role="presentation" onClick={onClose}>
@@ -46,12 +97,32 @@ export function WorkoutDetailSheet({
         <h2 id="detail-title">{workout.name}</h2>
         <div className="meta-grid prominent">
           <span><small>Time / Distance</small>{workout.miles ? `${workout.miles} mi` : workout.duration}</span>
-          <span><small>Target HR</small>{workout.targetBpm}</span>
-          <span><small>Target Pace</small>{workout.targetPace}</span>
+          <span className={activeTargetClass}><small>Target HR</small>{displayedTargetBpm}</span>
+          <span className={activeTargetClass}><small>Target Pace</small>{displayedTargetPace}</span>
           <span><small>Zones</small><ZoneChips zones={workout.zone} /></span>
         </div>
-        <ol className="step-list">
-          {workout.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}
+        <ol className="step-list interactive">
+          {segments.map((segment, index) => {
+            const isIntroActive = introIndex === index
+            const isSelected = selectedSegment === index
+            const isActive = activeSegmentIndex === index
+            return (
+              <li
+                className={`${zoneClass(segment.zone)} ${isActive ? 'active' : ''} ${isIntroActive ? 'intro-pulse' : ''} ${isSelected ? 'selected' : ''}`}
+                key={`${index}-${segment.step}`}
+              >
+                <button
+                  type="button"
+                  disabled={!introDone}
+                  onClick={() => setSelectedSegment(index)}
+                  aria-pressed={isSelected}
+                >
+                  <span>{segment.step}</span>
+                  <em>{segment.targetBpm} · {segment.targetPace}</em>
+                </button>
+              </li>
+            )
+          })}
         </ol>
         <p className="detail-note">{workout.notes}</p>
         <GarminCopyButton workout={workout} week1Start={week1Start} />

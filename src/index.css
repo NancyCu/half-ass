@@ -551,6 +551,39 @@ dt,
   font-weight: 900;
 }
 
+.workout-goal-strip {
+  border: 1px solid color-mix(in srgb, var(--tone, var(--cyan)) 56%, rgba(255, 255, 255, 0.14));
+  border-radius: 16px;
+  padding: 10px 12px;
+  color: color-mix(in srgb, var(--tone, var(--cyan)) 72%, #ffffff 28%);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--tone, var(--cyan)) 18%, transparent), rgba(255, 255, 255, 0.035));
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--tone, var(--cyan)) 10%, transparent);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.target-sync {
+  --target-tone: var(--cyan);
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.target-sync.z1 { --target-tone: var(--green); }
+.target-sync.z2 { --target-tone: var(--cyan); }
+.target-sync.z3 { --target-tone: var(--gold); }
+.target-sync.z4 { --target-tone: var(--orange); }
+.target-sync.z5 { --target-tone: var(--magenta); }
+
+.target-sync.active {
+  border-color: color-mix(in srgb, var(--target-tone) 70%, rgba(255, 255, 255, 0.16));
+  background:
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--target-tone) 20%, transparent), transparent 58%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.035));
+  box-shadow: 0 0 22px color-mix(in srgb, var(--target-tone) 18%, transparent);
+  transform: translateY(-1px);
+}
+
 .warning-banner {
   padding: 16px;
   border: 1px solid rgba(255, 59, 112, 0.75);
@@ -574,6 +607,7 @@ dt,
 }
 
 .step-list li {
+  --segment-tone: var(--cyan);
   position: relative;
   padding: 9px 11px 9px 36px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -583,6 +617,7 @@ dt,
   font-size: 14px;
   font-weight: 800;
   line-height: 1.35;
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .step-list li::before {
@@ -593,9 +628,76 @@ dt,
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: var(--cyan);
-  box-shadow: 0 0 16px rgba(23, 231, 255, 0.55);
+  background: var(--segment-tone);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--segment-tone) 55%, transparent);
   transform: translateY(-50%);
+}
+
+.step-list li.z1 { --segment-tone: var(--green); }
+.step-list li.z2 { --segment-tone: var(--cyan); }
+.step-list li.z3 { --segment-tone: var(--gold); }
+.step-list li.z4 { --segment-tone: var(--orange); }
+.step-list li.z5 { --segment-tone: var(--magenta); }
+
+.step-list.interactive li {
+  padding: 0;
+}
+
+.step-list.interactive li::before {
+  left: 13px;
+}
+
+.step-list.interactive button {
+  width: 100%;
+  min-height: 52px;
+  display: grid;
+  gap: 3px;
+  border: 0;
+  padding: 9px 11px 9px 36px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.step-list.interactive button:disabled {
+  cursor: default;
+}
+
+.step-list.interactive button span {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.step-list.interactive button em {
+  color: color-mix(in srgb, var(--segment-tone) 62%, var(--muted) 38%);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.step-list.interactive li.active {
+  border-color: color-mix(in srgb, var(--segment-tone) 76%, rgba(255, 255, 255, 0.18));
+  background:
+    radial-gradient(circle at 4% 50%, color-mix(in srgb, var(--segment-tone) 30%, transparent), transparent 42%),
+    linear-gradient(135deg, color-mix(in srgb, var(--segment-tone) 18%, rgba(255, 255, 255, 0.04)), rgba(255, 255, 255, 0.05));
+  box-shadow: 0 0 26px color-mix(in srgb, var(--segment-tone) 22%, transparent);
+  transform: scale(1.012);
+}
+
+.step-list.interactive li.selected {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--segment-tone) 50%, transparent),
+    0 0 28px color-mix(in srgb, var(--segment-tone) 24%, transparent);
+}
+
+.step-list.interactive li.intro-pulse {
+  animation: segmentPulse 2s ease-in-out;
+}
+
+@keyframes segmentPulse {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.028); }
+  68% { transform: scale(1.01); }
 }
 
 .button-row {
@@ -1672,6 +1774,18 @@ dd {
   animation: currentWeekStatPulse 1.9s ease-in-out infinite;
 }
 
+.stat-card.inactive-week {
+  border-color: rgba(142, 155, 176, 0.34);
+  background:
+    linear-gradient(145deg, rgba(142, 155, 176, 0.08), rgba(255, 255, 255, 0.025));
+  box-shadow: var(--shadow);
+}
+
+.stat-card.inactive-week strong,
+.stat-card.inactive-week p {
+  color: color-mix(in srgb, var(--muted) 78%, var(--text) 22%);
+}
+
 @keyframes currentWeekStatPulse {
   0%, 100% {
     box-shadow: var(--shadow), 0 0 14px color-mix(in srgb, var(--tone) 22%, transparent);
@@ -1980,22 +2094,31 @@ dd {
 }
 
 .dashboard-workout-tile {
+  --tile-tone: var(--cyan);
   position: relative;
   display: grid;
   gap: 7px;
   width: 100%;
   overflow: hidden;
   border: 1px solid rgba(23, 231, 255, 0.28);
-  border-left: 5px solid var(--cyan);
+  border-left: 5px solid var(--tile-tone);
   border-radius: 20px;
   padding: 10px 14px;
   color: var(--text);
   background:
-    radial-gradient(circle at 92% 14%, rgba(23, 231, 255, 0.2), transparent 8rem),
+    radial-gradient(circle at 92% 14%, color-mix(in srgb, var(--tile-tone) 22%, transparent), transparent 8rem),
     linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.035));
   text-align: left;
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
 }
+
+.dashboard-workout-tile.cyan { --tile-tone: var(--cyan); }
+.dashboard-workout-tile.green { --tile-tone: var(--green); }
+.dashboard-workout-tile.purple { --tile-tone: var(--magenta); }
+.dashboard-workout-tile.orange { --tile-tone: var(--orange); }
+.dashboard-workout-tile.gold,
+.dashboard-workout-tile.race { --tile-tone: var(--gold); }
+.dashboard-workout-tile.gray { --tile-tone: var(--gray); }
 
 .dashboard-workout-tile::after {
   content: "";
@@ -2005,7 +2128,7 @@ dd {
   width: 126px;
   height: 38px;
   opacity: 0.2;
-  background: repeating-linear-gradient(90deg, var(--cyan) 0 3px, transparent 3px 11px);
+  background: repeating-linear-gradient(90deg, var(--tile-tone) 0 3px, transparent 3px 11px);
   transform: rotate(-18deg);
 }
 
@@ -2026,7 +2149,7 @@ dd {
 
 .workout-tile-topline em {
   flex: 0 0 auto;
-  color: var(--cyan);
+  color: var(--tile-tone);
   font-style: normal;
   font-weight: 900;
 }
@@ -2065,6 +2188,20 @@ dd {
   font-size: 11px;
   font-weight: 900;
   line-height: 1.2;
+}
+
+.workout-tile-goal {
+  justify-self: stretch;
+  border: 1px solid color-mix(in srgb, var(--tile-tone) 54%, rgba(255, 255, 255, 0.14));
+  border-radius: 14px;
+  padding: 8px 10px;
+  color: color-mix(in srgb, var(--tile-tone) 72%, #ffffff 28%);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--tile-tone) 16%, transparent), rgba(255, 255, 255, 0.04));
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.3;
+  text-align: center;
 }
 
 .compact-warning,

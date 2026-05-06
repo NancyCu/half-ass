@@ -56,6 +56,7 @@ export function TodayWorkoutCard({
         <div><span>Target Pace</span><strong>{workout.targetPace}</strong></div>
         <div><span>Zones</span><strong><ZoneChips zones={workout.zone} /></strong></div>
       </div>
+      <p className="workout-goal-strip">{library.what}</p>
       {isEasyDay ? <div className="warning-banner">Stay under 143 bpm</div> : null}
       <ol className="step-list">
         {workout.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}

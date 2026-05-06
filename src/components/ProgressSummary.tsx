@@ -25,11 +25,15 @@ function progressColor(percent: number) {
 export function ProgressSummary({
   summary,
   currentWeek,
+  currentWeekLabel = 'Week',
   currentWeekTone = 'magenta',
+  currentWeekActive = true,
 }: {
   summary: Summary
-  currentWeek: number
+  currentWeek: number | string
+  currentWeekLabel?: string
   currentWeekTone?: AccentTone
+  currentWeekActive?: boolean
 }) {
   const completeTone = progressColor(summary.percentage)
   const values = {
@@ -46,16 +50,17 @@ export function ProgressSummary({
           ? { '--tone': completeTone } as CSSProperties
           : undefined
         const className = metric.key === 'week'
-          ? `stat-card current-week ${currentWeekTone}`
+          ? `stat-card ${currentWeekActive ? 'current-week' : 'inactive-week'} ${currentWeekTone}`
           : metric.key === 'complete'
             ? 'stat-card progress-complete'
             : `stat-card ${metric.tone}`
+        const label = metric.key === 'week' ? currentWeekLabel : metric.label
 
         return (
           <div className={className} style={style} key={metric.key}>
             <span className="stat-icon" aria-hidden="true" />
             <strong>{values[metric.key]}</strong>
-            <p>{metric.label}</p>
+            <p>{label}</p>
           </div>
         )
       })}
