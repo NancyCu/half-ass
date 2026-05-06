@@ -4,7 +4,7 @@ import { ZoneChips } from '../components/ZoneChips'
 import { allWorkouts, trainingPlan, type Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import type { useProgress } from '../hooks/useProgress'
-import { getCurrentWeek, getCurrentWeekNumber, getWorkoutForDate } from '../utils/workouts'
+import { getCurrentWeek, getCurrentWeekNumber, getWorkoutForDate, workoutDateLabel } from '../utils/workouts'
 
 type ProgressApi = ReturnType<typeof useProgress>
 
@@ -46,7 +46,9 @@ export function Dashboard({
 }) {
   const [drillWeek, setDrillWeek] = useState<number | null>(null)
   const [focusedPhase, setFocusedPhase] = useState<string | null>(null)
-  const today = getWorkoutForDate(new Date(), week1Start) ?? trainingPlan[0].days[0]
+  const todayWorkout = getWorkoutForDate(new Date(), week1Start)
+  const today = todayWorkout ?? trainingPlan[0].days[0]
+  const isWorkoutToday = Boolean(todayWorkout)
   const currentWeek = getCurrentWeek(week1Start)
   const currentWeekNumber = getCurrentWeekNumber(week1Start)
   const activePhase = focusedPhase ?? currentWeek.phase
@@ -80,6 +82,7 @@ export function Dashboard({
   const selectedWeek = drillWeek ? trainingPlan.find((week) => week.week === drillWeek) : null
   const activePhaseWeeks = phaseGroups[activePhase] ?? phaseGroups[currentWeek.phase] ?? []
   const distanceOrDuration = today.miles ? `${today.miles} mi` : today.duration
+  const workoutTileLabel = isWorkoutToday ? `${today.dayName} · Today` : `${workoutDateLabel(today, week1Start)} · Week ${today.week}`
   const todayNote = todayProgress?.note?.trim()
   const todayFlags = todayProgress?.flags ?? []
   const circumference = 2 * Math.PI * 42
@@ -207,7 +210,7 @@ export function Dashboard({
       </section>
       <button className="dashboard-workout-tile" type="button" onClick={() => onOpenWorkout(today)}>
         <span className="workout-tile-topline">
-          <span>{today.dayName} · Today</span>
+          <span>{workoutTileLabel}</span>
           {todayProgress?.status ? <em className={`status-pill ${todayProgress.status}`}>{todayProgress.status}</em> : <em>Tap for details</em>}
         </span>
         <strong>{today.name}</strong>
@@ -239,7 +242,7 @@ export function Dashboard({
           {currentWeek.days.map((workout) => {
             const status = progressApi.progress.workouts[workout.id]?.status
             const library = getWorkoutLibraryEntry(workout.type)
-            const isTodayWorkout = workout.id === today.id
+            const isTodayWorkout = isWorkoutToday && workout.id === today.id
             return (
               <button className={`dashboard-day-row ${library.color} ${status ?? ''} ${isTodayWorkout ? 'today-workout' : ''}`} key={workout.id} type="button" onClick={() => onOpenWorkout(workout)}>
                 <span className="dashboard-day-date">{workout.dayName.slice(0, 3)}</span>
