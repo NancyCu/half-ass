@@ -11,6 +11,29 @@
 - Settings must preserve Week 1 start, race-date alignment, theme, import/export, and reset workflows.
 - Do not add backend/cloud sync or direct StrideSync writes without explicit approval.
 
+## Integration Project Context
+
+This work is not a new standalone app, not a monorepo conversion yet, and not a rewrite or merger of the three apps. It is an integration/connection project between three existing apps:
+
+- StrideSync: main running data brain and Firebase/Strava source of truth.
+- GarminVault: Garmin FIT/local Garmin export inspection and future Garmin activity export tool.
+- Half_Ass_Training: training schedule/planned workout layer.
+
+For now, the goal is only to create safe shared data contracts and later export/import preview flows.
+
+Guardrails:
+
+- Do not create a new app inside `/Users/michaelnguyen/RunningApps`.
+- Do not turn `/Users/michaelnguyen/RunningApps` into a Git repo.
+- Do not convert the apps into a monorepo unless explicitly requested later.
+- Do not merge the apps together.
+- Do not make GarminVault or Half_Ass_Training write directly to StrideSync Firebase.
+- Do not connect databases during contract-only phases.
+- Do not change existing runtime behavior unless a later phase explicitly asks for it.
+- Prefer versioned JSON contracts first.
+- Prefer StrideSync preview/validation before any Firestore writes.
+- Treat StrideSync as production-sensitive.
+
 ## Required Checks Before Finishing
 
 ```bash
