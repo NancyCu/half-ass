@@ -21,7 +21,7 @@ npm run build
 The bottom navigation includes a `StrideSync` item so users can return to the StrideSync Training tab. Configure the destination with:
 
 ```bash
-VITE_STRIDESYNC_URL=https://your-stridesync-url.example/?trainingTab=1
+VITE_STRIDESYNC_URL=http://YOUR_MAC_LAN_IP:5173/?trainingTab=1
 ```
 
 When `VITE_STRIDESYNC_URL` is not set, local development falls back to:
@@ -29,6 +29,26 @@ When `VITE_STRIDESYNC_URL` is not set, local development falls back to:
 ```text
 http://localhost:5173/?trainingTab=1
 ```
+
+That localhost fallback only works when Half_Ass_Training and StrideSync are opened on the same computer. On an iPhone, `localhost` points to the phone, not the Mac, so mobile local testing should use the Mac LAN IP in `.env.local`.
+
+Example `.env.local`:
+
+```bash
+VITE_STRIDESYNC_URL=http://192.168.1.45:5173/?trainingTab=1
+```
+
+For local mobile testing, run StrideSync on the network port and run Half_Ass_Training on a separate port, for example:
+
+```bash
+cd /Users/michaelnguyen/RunningApps/StrideSync
+npm run dev:network:5173
+
+cd /Users/michaelnguyen/RunningApps/Half_Ass_Training
+npm run dev -- --host 0.0.0.0 --port 5174
+```
+
+Then open Half_Ass_Training from the phone at the Mac LAN IP and Half_Ass port, such as `http://192.168.1.45:5174`.
 
 ## Project Rules And Regression Guardrails
 
