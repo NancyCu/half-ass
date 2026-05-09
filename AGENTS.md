@@ -5,11 +5,20 @@ Use this file before starting any Codex or agent task in Half_Ass_Training.
 ## Start Every Task
 
 - Confirm the working directory is `/Users/michaelnguyen/RunningApps/Half_Ass_Training`.
-- Run `git status --short --branch` before editing.
-- Create a new branch before making changes:
-  `git switch -c codex/<short-task-name>`.
+- Confirm the current branch.
+- Confirm the working tree is clean before editing.
+- Create a new branch from `main` before making changes unless Michael says otherwise:
+  `git switch main && git pull --ff-only && git switch -c codex/<short-task-name>`.
 - Do not revert user changes unless Michael explicitly asks.
 - Identify private/generated files before staging. Do not commit `node_modules/`, `dist/`, `test-results/`, `output/`, local browser exports, screenshots, or private imported progress JSON files.
+
+## Workspace Boundaries
+
+- Work only in `/Users/michaelnguyen/RunningApps/Half_Ass_Training`.
+- Do not modify StrideSync.
+- Do not modify GarminVault.
+- Do not modify `/Users/michaelnguyen/RunningApps` as a Git repo.
+- Do not push or deploy unless Michael explicitly asks.
 
 ## Product Boundaries
 
@@ -72,6 +81,7 @@ Run before finishing:
 ```bash
 npm run lint
 npm run build
+git diff --check
 ```
 
 For UI work, also run the app and check mobile-width Dashboard, Calendar, Settings, and the workout detail sheet when possible.
@@ -79,7 +89,10 @@ For UI work, also run the app and check mobile-width Dashboard, Calendar, Settin
 ## Required Handoff
 
 - Summarize changed files.
+- State the current branch.
 - State verification results.
 - Mention anything not verified.
 - Call out unrelated dirty files that were not touched.
+- Confirm StrideSync and GarminVault were not modified.
+- Confirm nothing was pushed or deployed.
 - Provide commit/merge/push commands when Michael requests them.
