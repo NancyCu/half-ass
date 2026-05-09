@@ -59,3 +59,19 @@ The adapter maps the existing `WeekPlan[]`, optional settings, and optional prog
 ```
 
 This is preview/import-only for a later StrideSync flow. It does not connect to Firebase, does not write to Firestore, does not add a StrideSync dependency, and does not change localStorage migration behavior.
+
+## Developer Smoke-Test Export
+
+Phase 4.5 adds a developer-only script for manual integration smoke tests:
+
+```bash
+npm run export:run-system:sample
+```
+
+The export script reads the existing static `trainingPlan` data, creates a `TrainingPlanExportV1` payload with sample `week1Start` and `raceDate` settings, and writes:
+
+```text
+/tmp/half-ass-training-plan-export.json
+```
+
+This script is not app runtime behavior. It does not contact StrideSync, does not connect to Firebase, does not read or write Firestore, does not use the network, does not write localStorage, and does not change training plan data or localStorage migrations. The JSON file is for copy/paste preview in StrideSync at `?importPreview=1`; it does not save or import anything by itself.
