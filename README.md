@@ -18,7 +18,15 @@ npm run build
 
 ## StrideSync Link
 
-The bottom navigation includes a `StrideSync` item so users can return to the StrideSync Training tab. Configure the destination with:
+The bottom navigation includes a `StrideSync` item so users can return to the StrideSync Training tab. Configure the destination with `VITE_STRIDESYNC_URL`.
+
+For production deploys, set:
+
+```bash
+VITE_STRIDESYNC_URL=https://mikerun.web.app/?trainingTab=1
+```
+
+For mobile local testing, set:
 
 ```bash
 VITE_STRIDESYNC_URL=http://YOUR_MAC_LAN_IP:5173/?trainingTab=1
