@@ -77,3 +77,22 @@ export const zoneTargets: Record<string, { bpm: string; pace: string; reminder: 
   Rest: { bpm: 'No target', pace: 'No target', reminder: 'Recover so the next workout works.' },
   Race: { bpm: '155-169 bpm', pace: '8:15-8:45/mi', reminder: 'Start controlled, finish brave.' },
 }
+
+export const mannyZones: Zone[] = [
+  { id: 'z1', name: 'Zone 1', bpm: '125-134 bpm', pace: 'Recovery effort', effort: '1-2', purpose: 'Recovery and warm-up', tone: 'cyan' },
+  { id: 'z2', name: 'Zone 2', bpm: '135-149 bpm', pace: 'Comfortable aerobic', effort: '3-4', purpose: 'Fat-burning sweet spot', tone: 'green' },
+  { id: 'black-hole', name: 'Black Hole', bpm: '150-159 bpm', pace: 'Between easy and threshold', effort: '4.5-5', purpose: 'Avoid this middle-ground intensity on easy days.', tone: 'warning' },
+  { id: 'z3', name: 'Zone 3', bpm: '160-167 bpm', pace: 'Somewhat hard', effort: '5.5-6', purpose: 'Threshold / ventilatory threshold', tone: 'purple' },
+  { id: 'z4', name: 'Zone 4', bpm: '170-175 bpm', pace: 'Hard', effort: '7-8', purpose: 'VO2max capacity building', tone: 'orange' },
+  { id: 'z5', name: 'Zone 5', bpm: '177+ bpm', pace: 'Extremely hard', effort: '9-10', purpose: 'Neuromuscular speed and power', tone: 'red' },
+]
+
+export const mannyZoneTargets: Record<string, { bpm: string; pace: string; reminder: string }> = {
+  Z1: { bpm: '125-134 bpm', pace: 'Recovery effort', reminder: 'Keep it truly relaxed.' },
+  Z2: { bpm: '135-149 bpm', pace: 'Comfortable aerobic', reminder: 'Stay in the fat-burning sweet spot.' },
+  Z3: { bpm: '160-167 bpm', pace: 'Somewhat hard', reminder: 'Controlled threshold, not a race.' },
+  Z4: { bpm: '170-175 bpm', pace: 'Hard interval effort', reminder: 'Use pace/RPE early while HR catches up.' },
+  Z5: { bpm: '177+ bpm', pace: 'Extremely hard', reminder: 'Short, sharp, and clean.' },
+  Rest: { bpm: 'No target', pace: 'No target', reminder: 'Recover so the next workout works.' },
+  Race: { bpm: '160-175 bpm', pace: 'Progress by HR and RPE', reminder: 'Zone 3 first, Zone 4 late only if strong.' },
+}

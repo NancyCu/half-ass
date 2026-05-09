@@ -1,22 +1,24 @@
 import { RotateCcw } from 'lucide-react'
 import { ProgressSummary } from '../components/ProgressSummary'
-import { allWorkouts, type Workout } from '../data/trainingPlan'
+import type { TrainingPlanProfile, Workout } from '../data/trainingPlan'
 import type { useProgress } from '../hooks/useProgress'
 import { getCurrentWeekNumber, workoutDateLabel } from '../utils/workouts'
 
 type ProgressApi = ReturnType<typeof useProgress>
 
 export function Progress({
+  profile,
   week1Start,
   progressApi,
   onOpenWorkout,
 }: {
+  profile: TrainingPlanProfile
   week1Start: string
   progressApi: ProgressApi
   onOpenWorkout: (workout: Workout) => void
 }) {
-  const currentWeek = getCurrentWeekNumber(week1Start)
-  const touched = allWorkouts.filter((workout) => progressApi.progress.workouts[workout.id])
+  const currentWeek = getCurrentWeekNumber(week1Start, profile.allWorkouts)
+  const touched = profile.allWorkouts.filter((workout) => progressApi.progress.workouts[workout.id])
 
   function reset() {
     if (window.confirm('Reset workout progress, notes, and flags?')) {
@@ -28,7 +30,7 @@ export function Progress({
     <main className="screen">
       <header className="screen-header split-header">
         <div>
-          <p className="eyebrow">Local progress</p>
+          <p className="eyebrow">{profile.athleteName} · Local progress</p>
           <h1>Progress</h1>
         </div>
         <button className="icon-button" type="button" onClick={reset} aria-label="Reset progress">

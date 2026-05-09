@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import type { Workout } from '../data/trainingPlan'
+import type { Zone } from '../data/zones'
 import type { PainFlag, WorkoutStatus } from '../hooks/useProgress'
 import { getWorkoutSegments } from '../utils/workouts'
 import { GarminCopyButton } from './GarminCopyButton'
@@ -18,6 +19,8 @@ const flagLabels: Record<PainFlag, string> = {
 export function WorkoutDetailSheet({
   workout,
   week1Start,
+  zoneTargets,
+  zones,
   status,
   note,
   selectedFlags,
@@ -28,6 +31,8 @@ export function WorkoutDetailSheet({
 }: {
   workout: Workout | null
   week1Start: string
+  zoneTargets: Record<string, { bpm: string; pace: string; reminder: string }>
+  zones: Zone[]
   status?: WorkoutStatus
   note?: string
   selectedFlags: PainFlag[]
@@ -40,7 +45,7 @@ export function WorkoutDetailSheet({
   const [introDone, setIntroDone] = useState(false)
   const [selectedSegment, setSelectedSegment] = useState<number | null>(null)
 
-  const segments = useMemo(() => (workout ? getWorkoutSegments(workout) : []), [workout])
+  const segments = useMemo(() => (workout ? getWorkoutSegments(workout, zoneTargets, zones) : []), [workout, zoneTargets, zones])
 
   useEffect(() => {
     const reset = window.setTimeout(() => {

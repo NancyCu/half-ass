@@ -1,5 +1,6 @@
 import { Download, Upload } from 'lucide-react'
 import { ThemeToggle } from '../components/ThemeToggle'
+import { trainingPlanProfiles, type PlanId, type TrainingPlanProfile } from '../data/trainingPlan'
 import type { useProgress } from '../hooks/useProgress'
 import type { SettingsState } from '../hooks/useSettings'
 import { raceDateFromWeek1, week1FromRaceDate } from '../utils/dates'
@@ -11,11 +12,15 @@ export function Settings({
   updateSettings,
   resetSettings,
   progressApi,
+  activeProfile,
+  onPlanChange,
 }: {
   settings: SettingsState
   updateSettings: (patch: Partial<SettingsState>) => void
   resetSettings: () => void
   progressApi: ProgressApi
+  activeProfile: TrainingPlanProfile
+  onPlanChange: (planId: PlanId) => void
 }) {
   function exportProgress() {
     const blob = new Blob([JSON.stringify(progressApi.progress, null, 2)], { type: 'application/json' })
@@ -46,6 +51,23 @@ export function Settings({
         <p className="eyebrow">Plan setup</p>
         <h1>Settings</h1>
       </header>
+      <section className="settings-panel">
+        <h2>Plan athlete</h2>
+        <div className="plan-slider" role="group" aria-label="Active training plan">
+          {trainingPlanProfiles.map((profile) => (
+            <button
+              className={settings.planId === profile.id ? 'selected' : ''}
+              type="button"
+              key={profile.id}
+              onClick={() => onPlanChange(profile.id)}
+            >
+              <strong>{profile.athleteName}</strong>
+              <span>{profile.id === 'manny' ? 'Level 3' : 'Original'}</span>
+            </button>
+          ))}
+        </div>
+        <p className="settings-note">{activeProfile.description}</p>
+      </section>
       <section className="settings-panel">
         <label>
           <span>Set Week 1 start date</span>

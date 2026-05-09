@@ -1,23 +1,23 @@
 import { useMemo, useState } from 'react'
-import { allWorkouts } from '../data/trainingPlan'
+import type { TrainingPlanProfile } from '../data/trainingPlan'
 import { workoutLibrary } from '../data/workoutLibrary'
 
-export function WorkoutLibrary() {
+export function WorkoutLibrary({ profile }: { profile: TrainingPlanProfile }) {
   const [selectedType, setSelectedType] = useState(workoutLibrary[0]?.type)
   const selectedEntry = workoutLibrary.find((entry) => entry.type === selectedType) ?? workoutLibrary[0]
   const variantsByType = useMemo(() => {
-    return allWorkouts.reduce<Record<string, typeof allWorkouts>>((groups, workout) => {
+    return profile.allWorkouts.reduce<Record<string, typeof profile.allWorkouts>>((groups, workout) => {
       groups[workout.type] = [...(groups[workout.type] ?? []), workout]
       return groups
     }, {})
-  }, [])
+  }, [profile])
   const selectedVariants = selectedEntry ? variantsByType[selectedEntry.type] ?? [] : []
   const selectedVariantNames = [...new Set(selectedVariants.map((workout) => workout.name))]
 
   return (
     <main className="screen">
       <header className="screen-header">
-        <p className="eyebrow">Workout definitions</p>
+        <p className="eyebrow">{profile.athleteName} · Workout definitions</p>
         <h1>Library</h1>
       </header>
       <div className="library-stack">

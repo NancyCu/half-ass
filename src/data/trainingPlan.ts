@@ -1,5 +1,5 @@
 import { getWorkoutLibraryEntry, type WorkoutType } from './workoutLibrary'
-import { zoneTargets } from './zones'
+import { mannyZoneTargets, zoneTargets } from './zones'
 
 export type Workout = {
   id: string
@@ -24,6 +24,19 @@ export type WeekPlan = {
   phase: string
   label?: 'Recovery Week' | 'Taper Week' | 'Race Week'
   days: Workout[]
+}
+
+export type PlanId = 'mikey' | 'manny'
+
+export type TrainingPlanProfile = {
+  id: PlanId
+  athleteName: string
+  title: string
+  description: string
+  lactateThresholdHr: number
+  thresholdPace: string
+  trainingPlan: WeekPlan[]
+  allWorkouts: Workout[]
 }
 
 type WorkoutInput = {
@@ -111,24 +124,37 @@ const longTempoRepeatNumbers: Record<string, number> = {
   '12-10': 2,
 }
 
-function targetsFor(zone: string, type: WorkoutType) {
-  if (type === 'race') return zoneTargets.Race
-  if (type === 'rest') return zoneTargets.Rest
-  if (zone.includes('Z5')) return zoneTargets.Z5
-  if (zone.includes('Z4')) return zoneTargets.Z4
-  if (zone.includes('Z3')) return zoneTargets.Z3
-  if (zone === 'Z1') return zoneTargets.Z1
-  return zoneTargets.Z2
+function targetsFor(zone: string, type: WorkoutType, targets = zoneTargets) {
+  if (type === 'race') return targets.Race
+  if (type === 'rest') return targets.Rest
+  if (zone.includes('Z5')) return targets.Z5
+  if (zone.includes('Z4')) return targets.Z4
+  if (zone.includes('Z3')) return targets.Z3
+  if (zone === 'Z1') return targets.Z1
+  return targets.Z2
 }
 
-function phaseForWeek(week: number) {
+function mikeyPhaseForWeek(week: number) {
   if (week <= 6) return 'Base Phase'
   if (week <= 13) return 'Peak Phase'
   return 'Taper Phase'
 }
 
-function labelForWeek(week: number): WeekPlan['label'] | undefined {
+function mikeyLabelForWeek(week: number): WeekPlan['label'] | undefined {
   if ([3, 6, 9, 12].includes(week)) return 'Recovery Week'
+  if (week === 15) return 'Race Week'
+  if (week === 14) return 'Taper Week'
+  return undefined
+}
+
+function mannyPhaseForWeek(week: number) {
+  if (week <= 5) return 'Base Building'
+  if (week <= 12) return 'Peak Development'
+  return 'Taper and Race'
+}
+
+function mannyLabelForWeek(week: number): WeekPlan['label'] | undefined {
+  if ([5, 9].includes(week)) return 'Recovery Week'
   if (week === 15) return 'Race Week'
   if (week === 14) return 'Taper Week'
   return undefined
@@ -189,8 +215,43 @@ const easy = (minutes: number, zone2Minutes: number) => timedWorkout(
   z1CrossTrainNote,
 )
 
+const mannyFoundation75 = timedWorkout(
+  'Modified Foundation Run',
+  75,
+  'foundation',
+  'Z1/Z2',
+  ['5 mins Zone 1', '65 mins Zone 2', '5 mins Zone 1'],
+  'Weight-loss edition foundation run: complete the full 75 minutes to support fat oxidation and the IL-6 adaptation trigger.',
+)
+
+const mannyFoundation40 = timedWorkout(
+  'Foundation Run',
+  40,
+  'foundation',
+  'Z1/Z2',
+  ['5 mins Zone 1', '30 mins Zone 2', '5 mins Zone 1'],
+  z1CrossTrainNote,
+)
+
+const mannyFoundation30 = timedWorkout(
+  'Foundation Run',
+  30,
+  'foundation',
+  'Z1/Z2',
+  ['5 mins Zone 1', '20 mins Zone 2', '5 mins Zone 1'],
+  z1CrossTrainNote,
+)
+
 const fastFinish = (minutes: number, zone2Minutes: number, zone3Minutes: number) => timedWorkout(
   `Fast Finish Run ${fastFinishRunNumbers[`${minutes}-${zone2Minutes}-${zone3Minutes}`] ?? minutes}`,
+  minutes,
+  'fast-finish',
+  'Z1/Z2/Z3',
+  ['5 mins Zone 1', `${zone2Minutes} mins Zone 2`, `${zone3Minutes} mins Zone 3`],
+)
+
+const mannyFastFinish = (number: number, minutes: number, zone2Minutes: number, zone3Minutes: number) => timedWorkout(
+  `Fast Finish ${number}`,
   minutes,
   'fast-finish',
   'Z1/Z2/Z3',
@@ -205,9 +266,25 @@ const tempo = (minutes: number, zone3Minutes: number) => timedWorkout(
   ['5 mins Zone 1', '5 mins Zone 2', `${zone3Minutes} mins Zone 3`, '5 mins Zone 2', '5 mins Zone 1'],
 )
 
+const mannyTempo = (number: number, zone3Minutes: number) => timedWorkout(
+  `Tempo Run ${number}`,
+  20 + zone3Minutes,
+  'tempo',
+  'Z1/Z2/Z3',
+  ['5 mins Zone 1', '5 mins Zone 2', `${zone3Minutes} mins Zone 3`, '5 mins Zone 2', '5 mins Zone 1'],
+)
+
 const cruise = (minutes: number, repeatMinutes: number) => timedWorkout(
   `Cruise Interval Run ${cruiseIntervalRunNumbers[repeatMinutes] ?? repeatMinutes}`,
   minutes,
+  'cruise',
+  'Z1/Z2/Z3',
+  ['5 mins Zone 1', '5 mins Zone 2', `4 sets of (${repeatMinutes} mins Zone 3 / 3 mins Zone 1 recovery)`, '5 mins Zone 2', '5 mins Zone 1'],
+)
+
+const mannyCruise = (number: number, repeatMinutes: number) => timedWorkout(
+  `Cruise Int. ${number}`,
+  20 + (4 * repeatMinutes) + 12,
   'cruise',
   'Z1/Z2/Z3',
   ['5 mins Zone 1', '5 mins Zone 2', `4 sets of (${repeatMinutes} mins Zone 3 / 3 mins Zone 1 recovery)`, '5 mins Zone 2', '5 mins Zone 1'],
@@ -221,6 +298,22 @@ const shortSpeed = (minutes: number, sets: number, work: string, recovery: strin
   uphill ? 'hills' : 'short-interval',
   'Z1/Z2/Z5',
   ['5 mins Zone 1', '5 mins Zone 2', `${sets} sets of (${work} ${uphill ? 'uphill ' : ''}Zone 5 / ${recovery} Zone 1 recovery)`, '5 mins Zone 1'],
+)
+
+const mannySpeedPlay = (number: number, sets: number, workMinutes: number, zone: 'Z4' | 'Z5') => timedWorkout(
+  `Speed Play ${number}`,
+  15 + sets * (workMinutes + 2),
+  'speed-play',
+  `Z1/Z2/${zone}`,
+  ['5 mins Zone 1', '5 mins Zone 2', `${sets} sets of (${workMinutes} min ${zone === 'Z4' ? 'Zone 4' : 'Zone 5'} / 2 mins Zone 1 recovery)`, '5 mins Zone 1'],
+)
+
+const mannyHillReps = (number: number, sets: number, work: string, recovery: string) => timedWorkout(
+  `Hill Reps ${number}`,
+  15 + sets * (work.includes('30') ? 2 : 3),
+  'hills',
+  'Z1/Z2/Z5',
+  ['5 mins Zone 1', '5 mins Zone 2', `${sets} sets of (${work} uphill Zone 5 / ${recovery} Zone 1 recovery)`, '5 mins Zone 1'],
 )
 
 const z4Intervals = (minutes: number, sets: number, work: string, recovery: string) => timedWorkout(
@@ -283,6 +376,24 @@ const raceDay = distanceWorkout(
   'Z3/Z4',
   ['Half Marathon'],
   'Start controlled, stay composed through the middle miles, and race the final stretch if HR and legs agree.',
+)
+
+const mannyRaceDay = distanceWorkout(
+  'HALF MARATHON',
+  13.1,
+  'race',
+  'Z3/Z4',
+  ['Maintain Zone 3 for the first 10 miles', 'If strong, progress into high Zone 3 / low Zone 4 for the final 5K', 'Save Zone 5 for the final 400 meters only'],
+  'Race day: stay controlled early, then progress only if the body and heart rate are steady.',
+)
+
+const offDay = timedWorkout(
+  'Off',
+  0,
+  'rest',
+  'Rest',
+  ['No scheduled workout'],
+  'Full rest day. Keep it easy so the next workout can do its job.',
 )
 
 const weeklyWorkouts: WorkoutInput[][] = [
@@ -423,8 +534,33 @@ const weeklyWorkouts: WorkoutInput[][] = [
   ],
 ]
 
-function workoutFromInput(input: WorkoutInput, week: number, dayIndex: number): Workout {
-  const targets = targetsFor(input.zone, input.type)
+const mannyWeeklyWorkouts: WorkoutInput[][] = [
+  [mannyFoundation75, z1All(30), mannySpeedPlay(2, 5, 1, 'Z5'), mannyFoundation75, mannyFastFinish(2, 30, 20, 5), longRun(6, 4.5), mannyFoundation75],
+  [mannyFoundation75, z1All(30), mannySpeedPlay(3, 4, 2, 'Z4'), mannyFoundation75, mannyFastFinish(3, 35, 20, 10), longRun(7, 5.5), mannyFoundation75],
+  [mannyFoundation75, z1All(35), mannyHillReps(1, 6, '30 secs', '90 secs'), mannyFoundation75, mannyTempo(1, 15), longRun(8, 6.5), mannyFoundation75],
+  [mannyFoundation75, z1All(35), mannySpeedPlay(4, 6, 1, 'Z5'), mannyFoundation75, mannyFastFinish(4, 40, 25, 10), longRun(9, 7.5), mannyFoundation75],
+  [mannyFoundation75, z1All(20), mannyFoundation40, mannyFoundation75, z1All(20), longRun(6, 4.5), mannyFoundation75],
+  [mannyFoundation75, z1All(40), mannySpeedPlay(5, 5, 2, 'Z4'), mannyFoundation75, mannyTempo(2, 18), longRun(10, 8.5), mannyFoundation75],
+  [mannyFoundation75, z1All(40), mannyHillReps(2, 8, '30 secs', '90 secs'), mannyFoundation75, mannyCruise(1, 5), longRun(11, 9.5), mannyFoundation75],
+  [mannyFoundation75, z1All(45), mannySpeedPlay(7, 6, 2, 'Z4'), mannyFoundation75, mannyTempo(3, 20), longRun(12, 10.5), mannyFoundation75],
+  [mannyFoundation75, z1All(20), mannyFoundation40, mannyFoundation75, z1All(25), longRun(7, 5.5), mannyFoundation75],
+  [mannyFoundation75, z1All(45), mannyHillReps(3, 6, '1 min', '2 mins'), mannyFoundation75, mannyCruise(2, 8), longRun(13, 11.5), mannyFoundation75],
+  [mannyFoundation75, z1All(50), mannySpeedPlay(10, 7, 2, 'Z4'), mannyFoundation75, mannyTempo(5, 28), longRun(14, 12.5), mannyFoundation75],
+  [mannyFoundation75, z1All(50), mannySpeedPlay(12, 8, 2, 'Z4'), mannyFoundation75, mannyCruise(3, 10), longRun(15, 13.5), mannyFoundation75],
+  [mannyFoundation75, z1All(30), mannySpeedPlay(5, 5, 2, 'Z4'), mannyFoundation75, mannyTempo(3, 20), longRun(10, 8.5), mannyFoundation75],
+  [mannyFoundation40, z1All(25), mannySpeedPlay(2, 5, 1, 'Z5'), mannyFoundation40, z1All(20), longRun(7, 5.5), mannyFoundation40],
+  [z1All(20), mannyFoundation30, mannySpeedPlay(1, 3, 2, 'Z4'), offDay, z1All(20), mannyRaceDay, offDay],
+]
+
+function workoutFromInput(
+  input: WorkoutInput,
+  week: number,
+  dayIndex: number,
+  phaseForPlan: (week: number) => string,
+  labelForPlan: (week: number) => WeekPlan['label'] | undefined,
+  targets = zoneTargets,
+): Workout {
+  const workoutTargets = targetsFor(input.zone, input.type, targets)
   const libraryEntry = getWorkoutLibraryEntry(input.type)
 
   return {
@@ -436,24 +572,61 @@ function workoutFromInput(input: WorkoutInput, week: number, dayIndex: number): 
     duration: input.duration,
     miles: input.miles,
     type: input.type,
-    targetBpm: targets.bpm,
-    targetPace: targets.pace,
+    targetBpm: workoutTargets.bpm,
+    targetPace: workoutTargets.pace,
     zone: input.zone,
     steps: input.steps,
-    notes: input.notes ?? `${libraryEntry.what} ${targets.reminder}`,
-    phase: phaseForWeek(week),
-    weekLabel: labelForWeek(week),
+    notes: input.notes ?? `${libraryEntry.what} ${workoutTargets.reminder}`,
+    phase: phaseForPlan(week),
+    weekLabel: labelForPlan(week),
   }
 }
 
-export const trainingPlan: WeekPlan[] = weeklyWorkouts.map((days, index) => {
-  const week = index + 1
-  return {
-    week,
-    phase: phaseForWeek(week),
-    label: labelForWeek(week),
-    days: days.map((workout, dayIndex) => workoutFromInput(workout, week, dayIndex)),
-  }
-})
+function buildTrainingPlan(
+  workouts: WorkoutInput[][],
+  phaseForPlan: (week: number) => string,
+  labelForPlan: (week: number) => WeekPlan['label'] | undefined,
+  targets = zoneTargets,
+) {
+  return workouts.map((days, index) => {
+    const week = index + 1
+    return {
+      week,
+      phase: phaseForPlan(week),
+      label: labelForPlan(week),
+      days: days.map((workout, dayIndex) => workoutFromInput(workout, week, dayIndex, phaseForPlan, labelForPlan, targets)),
+    }
+  })
+}
 
+export const trainingPlan: WeekPlan[] = buildTrainingPlan(weeklyWorkouts, mikeyPhaseForWeek, mikeyLabelForWeek)
 export const allWorkouts = trainingPlan.flatMap((week) => week.days)
+export const mannyTrainingPlan: WeekPlan[] = buildTrainingPlan(mannyWeeklyWorkouts, mannyPhaseForWeek, mannyLabelForWeek, mannyZoneTargets)
+export const mannyAllWorkouts = mannyTrainingPlan.flatMap((week) => week.days)
+
+export const trainingPlanProfiles: TrainingPlanProfile[] = [
+  {
+    id: 'mikey',
+    athleteName: 'Mikey',
+    title: '15-Week Level 2 Half Marathon Training Plan',
+    description: 'The original Texas Meltdown 80/20 plan.',
+    lactateThresholdHr: 161,
+    thresholdPace: '8:19/mi',
+    trainingPlan,
+    allWorkouts,
+  },
+  {
+    id: 'manny',
+    athleteName: 'Manny',
+    title: '15-Week Level 3 Half Marathon Training Plan: Weight Loss Edition',
+    description: 'Higher-volume 80/20 plan with 75-minute foundation runs and Manny-specific HR zones.',
+    lactateThresholdHr: 167,
+    thresholdPace: 'Zone 3: 160-167 bpm',
+    trainingPlan: mannyTrainingPlan,
+    allWorkouts: mannyAllWorkouts,
+  },
+]
+
+export function getTrainingPlanProfile(planId: PlanId) {
+  return trainingPlanProfiles.find((profile) => profile.id === planId) ?? trainingPlanProfiles[0]
+}

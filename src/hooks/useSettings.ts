@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { PlanId } from '../data/trainingPlan'
 import { defaultWeek1Start, raceDateFromWeek1 } from '../utils/dates'
 
 const STORAGE_KEY = 'half_ass_training_settings_v1'
@@ -6,6 +7,7 @@ const STORAGE_KEY = 'half_ass_training_settings_v1'
 export type ThemeMode = 'dark' | 'print'
 
 export type SettingsState = {
+  planId: PlanId
   week1Start: string
   raceDate: string
   theme: ThemeMode
@@ -14,6 +16,7 @@ export type SettingsState = {
 function defaultSettings(): SettingsState {
   const week1Start = defaultWeek1Start()
   return {
+    planId: 'mikey',
     week1Start,
     raceDate: raceDateFromWeek1(week1Start),
     theme: 'dark',

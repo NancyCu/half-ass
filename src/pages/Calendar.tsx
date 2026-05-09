@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, LocateFixed } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { WeekCard } from '../components/WeekCard'
 import { ZoneChips } from '../components/ZoneChips'
-import { allWorkouts, trainingPlan, type WeekPlan, type Workout } from '../data/trainingPlan'
+import type { TrainingPlanProfile, WeekPlan, Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import type { useProgress } from '../hooks/useProgress'
 import { addDays, daysBetween, parseISODate, toISODate } from '../utils/dates'
@@ -29,12 +29,12 @@ function monthLabel(date: Date) {
   return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date)
 }
 
-function buildMonthDays(monthDate: Date, week1Start: string): CalendarDay[] {
+function buildMonthDays(monthDate: Date, week1Start: string, workouts: Workout[]): CalendarDay[] {
   const firstOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)
   const firstGridDate = addDays(firstOfMonth, -((firstOfMonth.getDay() + 6) % 7))
   const firstPlanDate = parseISODate(week1Start)
-  const lastPlanDate = addDays(firstPlanDate, allWorkouts.length - 1)
-  const workoutByISO = new Map(allWorkouts.map((workout) => [toISODate(workoutDate(workout, week1Start)), workout]))
+  const lastPlanDate = addDays(firstPlanDate, workouts.length - 1)
+  const workoutByISO = new Map(workouts.map((workout) => [toISODate(workoutDate(workout, week1Start)), workout]))
   const todayISO = toISODate(new Date())
 
   return Array.from({ length: 42 }, (_, index) => {
@@ -101,30 +101,33 @@ function isQualityWorkout(workout: Workout) {
 }
 
 export function Calendar({
+  profile,
   week1Start,
   progressApi,
   onOpenWorkout,
 }: {
+  profile: TrainingPlanProfile
   week1Start: string
   progressApi: ProgressApi
   onOpenWorkout: (workout: Workout) => void
 }) {
-  const currentWeek = getCurrentWeekNumber(week1Start)
+  const { allWorkouts, trainingPlan } = profile
+  const currentWeek = getCurrentWeekNumber(week1Start, allWorkouts)
   const currentBlock = Math.floor((currentWeek - 1) / 4)
   const [mode, setMode] = useState<CalendarMode>('month')
   const [visibleMonth, setVisibleMonth] = useState(() => new Date())
   const [selectedRoadmapWeek, setSelectedRoadmapWeek] = useState<WeekPlan | null>(null)
 
-  const monthDays = useMemo(() => buildMonthDays(visibleMonth, week1Start), [visibleMonth, week1Start])
+  const monthDays = useMemo(() => buildMonthDays(visibleMonth, week1Start, allWorkouts), [allWorkouts, visibleMonth, week1Start])
   const monthWorkouts = useMemo(
     () => monthDays.filter((day) => day.date.getMonth() === visibleMonth.getMonth() && day.workout),
     [monthDays, visibleMonth],
   )
   const currentWeekPlan = useMemo(
     () => trainingPlan.find((week) => week.week === currentWeek) ?? trainingPlan[0],
-    [currentWeek],
+    [currentWeek, trainingPlan],
   )
-  const blockWeeks = useMemo(() => trainingPlan.slice(currentBlock * 4, currentBlock * 4 + 4), [currentBlock])
+  const blockWeeks = useMemo(() => trainingPlan.slice(currentBlock * 4, currentBlock * 4 + 4), [currentBlock, trainingPlan])
 
   const completed = monthWorkouts.filter((day) => day.workout && progressApi.progress.workouts[day.workout.id]?.status === 'completed').length
   const longRuns = monthWorkouts.filter((day) => day.workout && isLongWorkout(day.workout)).length
@@ -140,7 +143,7 @@ export function Calendar({
     <main className="screen">
       <header className="screen-header split-header">
         <div>
-          <p className="eyebrow">15-week plan</p>
+          <p className="eyebrow">{profile.athleteName} · 15-week plan</p>
           <h1>{title}</h1>
         </div>
         {mode === 'month' ? (

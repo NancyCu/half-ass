@@ -446,6 +446,41 @@ h3,
   backdrop-filter: blur(5px);
 }
 
+.plan-switcher {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(3, 8, 24, 0.64);
+  backdrop-filter: blur(10px);
+}
+
+.plan-switcher button,
+.plan-slider button {
+  border: 0;
+  color: rgba(248, 251, 255, 0.74);
+  background: transparent;
+  font-weight: 950;
+}
+
+.plan-switcher button {
+  min-width: 72px;
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 7px 12px;
+}
+
+.plan-switcher button.selected,
+.plan-slider button.selected {
+  color: #031014;
+  background: linear-gradient(135deg, var(--cyan), var(--green));
+  box-shadow: 0 10px 28px rgba(23, 231, 255, 0.22);
+}
+
 .dashboard-ring svg {
   position: absolute;
   inset: 0;
@@ -1568,6 +1603,39 @@ input:focus {
   display: grid;
   gap: 12px;
   padding: 14px;
+}
+
+.plan-slider {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(5, 8, 18, 0.72);
+}
+
+.plan-slider button {
+  display: grid;
+  gap: 2px;
+  min-height: 52px;
+  border-radius: 999px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.plan-slider button span {
+  font-size: 0.72rem;
+  color: inherit;
+  opacity: 0.78;
+}
+
+.settings-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .zone-card,

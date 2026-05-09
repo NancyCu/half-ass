@@ -1,8 +1,8 @@
 import { Plus, Trash2, X } from 'lucide-react'
-import { useState, type CSSProperties, type FormEvent } from 'react'
+import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { ProgressSummary } from '../components/ProgressSummary'
 import { ZoneChips } from '../components/ZoneChips'
-import { allWorkouts, trainingPlan, type Workout } from '../data/trainingPlan'
+import type { TrainingPlanProfile, WeekPlan, Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import type { ManualRunEntry, useProgress } from '../hooks/useProgress'
 import { getMonday, parseISODate, toISODate } from '../utils/dates'
@@ -99,11 +99,16 @@ export function Dashboard({
   week1Start,
   progressApi,
   onOpenWorkout,
+  profile,
+  planSwitcher,
 }: {
+  profile: TrainingPlanProfile
   week1Start: string
   progressApi: ProgressApi
   onOpenWorkout: (workout: Workout) => void
+  planSwitcher?: ReactNode
 }) {
+  const { allWorkouts, trainingPlan } = profile
   const [drillWeek, setDrillWeek] = useState<number | null>(null)
   const [focusedPhase, setFocusedPhase] = useState<string | null>(null)
   const [isManualRunOpen, setIsManualRunOpen] = useState(false)
@@ -114,13 +119,13 @@ export function Dashboard({
   const [manualRunPace, setManualRunPace] = useState('')
   const [manualRunHr, setManualRunHr] = useState('')
   const [selectedManualRun, setSelectedManualRun] = useState<ManualRunEntry | null>(null)
-  const todayWorkout = getWorkoutForDate(new Date(), week1Start)
+  const todayWorkout = getWorkoutForDate(new Date(), week1Start, allWorkouts)
   const today = todayWorkout ?? trainingPlan[0].days[0]
   const todayISO = toISODate(new Date())
   const weekStartISO = toISODate(getMonday(new Date()))
   const isWorkoutToday = Boolean(todayWorkout)
-  const currentWeek = getCurrentWeek(week1Start)
-  const planTiming = getPlanTiming(week1Start)
+  const currentWeek = getCurrentWeek(week1Start, trainingPlan)
+  const planTiming = getPlanTiming(week1Start, trainingPlan)
   const activeWeekNumber = planTiming.state === 'active' ? planTiming.weekNumber : null
   const activePhase = focusedPhase ?? currentWeek.phase
   const todayLibrary = getWorkoutLibraryEntry(today.type)
@@ -149,7 +154,7 @@ export function Dashboard({
   }
   const loggedTotal = statusCounts.completed + statusCounts.modified + statusCounts.skipped
   const upcomingCount = Math.max(allWorkouts.length - loggedTotal, 0)
-  const phaseGroups = trainingPlan.reduce<Record<string, typeof trainingPlan>>((groups, week) => {
+  const phaseGroups = trainingPlan.reduce<Record<string, WeekPlan[]>>((groups, week) => {
     groups[week.phase] = [...(groups[week.phase] ?? []), week]
     return groups
   }, {})
@@ -196,9 +201,10 @@ export function Dashboard({
         <img className="dashboard-banner-art" src="/tx_meltdown_banner.PNG" alt="Texas Meltdown half marathon banner" />
         <div className="dashboard-banner-status">
           <p className="eyebrow">Training dashboard</p>
-          <strong>{compactDate}</strong>
+          <strong>{profile.athleteName} · {compactDate}</strong>
           <span>{planTiming.headerText}</span>
         </div>
+        {planSwitcher}
         <div
           className="dashboard-ring"
           style={{ '--progress-tone': progressColor(progressApi.summary.percentage) } as CSSProperties}

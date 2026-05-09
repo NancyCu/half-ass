@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { allWorkouts } from '../data/trainingPlan'
+import { allWorkouts as defaultAllWorkouts, type PlanId, type Workout } from '../data/trainingPlan'
 
 const STORAGE_KEY = 'half_ass_training_progress_v1'
 
@@ -32,9 +32,13 @@ export type ProgressState = {
 
 const initialProgress: ProgressState = { workouts: {}, manualRuns: [] }
 
-function readProgress(): ProgressState {
+function storageKeyForPlan(planId: PlanId) {
+  return planId === 'mikey' ? STORAGE_KEY : `${STORAGE_KEY}_${planId}`
+}
+
+function readProgress(planId: PlanId): ProgressState {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(storageKeyForPlan(planId))
     if (!raw) return initialProgress
     const parsed = JSON.parse(raw) as ProgressState
     return {
@@ -46,28 +50,38 @@ function readProgress(): ProgressState {
   }
 }
 
-export function useProgress() {
-  const [progress, setProgress] = useState<ProgressState>(() => {
-    if (typeof window === 'undefined') return initialProgress
-    return readProgress()
+export function useProgress(planId: PlanId = 'mikey', workouts: Workout[] = defaultAllWorkouts) {
+  const [progressByPlan, setProgressByPlan] = useState<Record<PlanId, ProgressState>>(() => {
+    if (typeof window === 'undefined') return { mikey: initialProgress, manny: initialProgress }
+    return {
+      mikey: readProgress('mikey'),
+      manny: readProgress('manny'),
+    }
   })
+  const progress = progressByPlan[planId] ?? initialProgress
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
-  }, [progress])
+    window.localStorage.setItem(storageKeyForPlan(planId), JSON.stringify(progress))
+  }, [planId, progress])
 
   function updateWorkout(id: string, patch: WorkoutProgress) {
-    setProgress((current) => ({
-      ...current,
-      workouts: {
-        ...current.workouts,
-        [id]: {
-          ...current.workouts[id],
-          ...patch,
-          updatedAt: new Date().toISOString(),
+    setProgressByPlan((allProgress) => {
+      const current = allProgress[planId] ?? initialProgress
+      return {
+        ...allProgress,
+        [planId]: {
+          ...current,
+          workouts: {
+            ...current.workouts,
+            [id]: {
+              ...current.workouts[id],
+              ...patch,
+              updatedAt: new Date().toISOString(),
+            },
+          },
         },
-      },
-    }))
+      }
+    })
   }
 
   function setStatus(id: string, status?: WorkoutStatus) {
@@ -86,35 +100,50 @@ export function useProgress() {
   }
 
   function addManualRun(entry: Omit<ManualRunEntry, 'id' | 'createdAt'>) {
-    setProgress((current) => ({
-      ...current,
-      manualRuns: [
-        {
-          ...entry,
-          id: crypto.randomUUID(),
-          createdAt: new Date().toISOString(),
+    setProgressByPlan((allProgress) => {
+      const current = allProgress[planId] ?? initialProgress
+      return {
+        ...allProgress,
+        [planId]: {
+          ...current,
+          manualRuns: [
+            {
+              ...entry,
+              id: crypto.randomUUID(),
+              createdAt: new Date().toISOString(),
+            },
+            ...(current.manualRuns ?? []),
+          ],
         },
-        ...(current.manualRuns ?? []),
-      ],
-    }))
+      }
+    })
   }
 
   function removeManualRun(id: string) {
-    setProgress((current) => ({
-      ...current,
-      manualRuns: (current.manualRuns ?? []).filter((run) => run.id !== id),
-    }))
+    setProgressByPlan((allProgress) => {
+      const current = allProgress[planId] ?? initialProgress
+      return {
+        ...allProgress,
+        [planId]: {
+          ...current,
+          manualRuns: (current.manualRuns ?? []).filter((run) => run.id !== id),
+        },
+      }
+    })
   }
 
   function resetProgress() {
-    setProgress(initialProgress)
+    setProgressByPlan((allProgress) => ({ ...allProgress, [planId]: initialProgress }))
   }
 
   function importProgress(next: ProgressState) {
-    setProgress({
-      workouts: next.workouts ?? {},
-      manualRuns: Array.isArray(next.manualRuns) ? next.manualRuns : [],
-    })
+    setProgressByPlan((allProgress) => ({
+      ...allProgress,
+      [planId]: {
+        workouts: next.workouts ?? {},
+        manualRuns: Array.isArray(next.manualRuns) ? next.manualRuns : [],
+      },
+    }))
   }
 
   const summary = useMemo(() => {
@@ -122,23 +151,23 @@ export function useProgress() {
     const completedIds = entries.filter(([, value]) => value.status === 'completed').map(([id]) => id)
     const skipped = entries.filter(([, value]) => value.status === 'skipped').length
     const modified = entries.filter(([, value]) => value.status === 'modified').length
-    const completedWorkouts = allWorkouts.filter((workout) => completedIds.includes(workout.id))
+    const completedWorkouts = workouts.filter((workout) => completedIds.includes(workout.id))
     const longest = completedWorkouts.reduce((max, workout) => Math.max(max, workout.miles ?? 0), 0)
     const lastId = entries
       .filter(([, value]) => value.status === 'completed' && value.updatedAt)
       .sort((a, b) => String(b[1].updatedAt).localeCompare(String(a[1].updatedAt)))[0]?.[0]
-    const lastWorkout = allWorkouts.find((workout) => workout.id === lastId)
+    const lastWorkout = workouts.find((workout) => workout.id === lastId)
 
     return {
       completed: completedIds.length,
       skipped,
       modified,
-      total: allWorkouts.length,
-      percentage: Math.round((completedIds.length / allWorkouts.length) * 100),
+      total: workouts.length,
+      percentage: Math.round((completedIds.length / workouts.length) * 100),
       longestRun: longest,
       lastWorkout,
     }
-  }, [progress])
+  }, [progress, workouts])
 
   return {
     progress,

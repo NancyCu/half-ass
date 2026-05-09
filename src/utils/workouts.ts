@@ -1,5 +1,5 @@
-import { allWorkouts, trainingPlan, type Workout } from '../data/trainingPlan'
-import { zoneTargets, zones } from '../data/zones'
+import { allWorkouts, trainingPlan, type WeekPlan, type Workout } from '../data/trainingPlan'
+import { zoneTargets, zones, type Zone } from '../data/zones'
 import { addDays, daysBetween, formatFriendlyDate, parseISODate, toISODate } from './dates'
 
 export type WorkoutSegment = {
@@ -15,11 +15,11 @@ function zoneForStep(step: string) {
   return match ? `Z${match[1]}` : null
 }
 
-export function getWorkoutSegments(workout: Workout): WorkoutSegment[] {
+export function getWorkoutSegments(workout: Workout, targets = zoneTargets, zoneList: Zone[] = zones): WorkoutSegment[] {
   return workout.steps.map((step) => {
     const zone = zoneForStep(step)
-    const target = zone ? zoneTargets[zone] : null
-    const zoneDetail = zone ? zones.find((entry) => entry.id === zone.toLowerCase()) : null
+    const target = zone ? targets[zone] : null
+    const zoneDetail = zone ? zoneList.find((entry) => entry.id === zone.toLowerCase()) : null
 
     return {
       step,
@@ -43,23 +43,24 @@ export function workoutISO(workout: Workout, week1StartISO: string) {
   return toISODate(workoutDate(workout, week1StartISO))
 }
 
-export function getWorkoutForDate(date: Date, week1StartISO: string) {
+export function getWorkoutForDate(date: Date, week1StartISO: string, workouts: Workout[] = allWorkouts) {
   const offset = daysBetween(parseISODate(week1StartISO), date)
-  if (offset < 0 || offset >= allWorkouts.length) return null
+  if (offset < 0 || offset >= workouts.length) return null
   const week = Math.floor(offset / 7) + 1
   const day = (offset % 7) + 1
-  return allWorkouts.find((workout) => workout.week === week && workout.day === day) ?? null
+  return workouts.find((workout) => workout.week === week && workout.day === day) ?? null
 }
 
-export function getCurrentWeekNumber(week1StartISO: string) {
+export function getCurrentWeekNumber(week1StartISO: string, workouts: Workout[] = allWorkouts) {
   const offset = daysBetween(parseISODate(week1StartISO), new Date())
   if (offset < 0) return 1
-  if (offset > 104) return 15
+  if (offset > workouts.length - 1) return Math.ceil(workouts.length / 7)
   return Math.floor(offset / 7) + 1
 }
 
-export function getPlanTiming(week1StartISO: string, date = new Date()) {
+export function getPlanTiming(week1StartISO: string, plan: WeekPlan[] = trainingPlan, date = new Date()) {
   const offset = daysBetween(parseISODate(week1StartISO), date)
+  const workoutCount = plan.reduce((total, week) => total + week.days.length, 0)
 
   if (offset < 0) {
     return {
@@ -71,7 +72,7 @@ export function getPlanTiming(week1StartISO: string, date = new Date()) {
     }
   }
 
-  if (offset >= allWorkouts.length) {
+  if (offset >= workoutCount) {
     return {
       state: 'after' as const,
       weekNumber: null,
@@ -82,7 +83,7 @@ export function getPlanTiming(week1StartISO: string, date = new Date()) {
   }
 
   const weekNumber = Math.floor(offset / 7) + 1
-  const week = trainingPlan.find((entry) => entry.week === weekNumber) ?? trainingPlan[0]
+  const week = plan.find((entry) => entry.week === weekNumber) ?? plan[0]
 
   return {
     state: 'active' as const,
@@ -93,9 +94,9 @@ export function getPlanTiming(week1StartISO: string, date = new Date()) {
   }
 }
 
-export function getCurrentWeek(week1StartISO: string) {
-  const week = getCurrentWeekNumber(week1StartISO)
-  return trainingPlan.find((entry) => entry.week === week) ?? trainingPlan[0]
+export function getCurrentWeek(week1StartISO: string, plan: WeekPlan[] = trainingPlan) {
+  const week = getCurrentWeekNumber(week1StartISO, plan.flatMap((entry) => entry.days))
+  return plan.find((entry) => entry.week === week) ?? plan[0]
 }
 
 export function copyWorkoutText(workout: Workout, week1StartISO: string) {
