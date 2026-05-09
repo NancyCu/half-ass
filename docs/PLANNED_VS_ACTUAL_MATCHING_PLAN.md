@@ -8,6 +8,59 @@ Half_Ass_Training should remain the owner of planned workouts, schedule state, a
 
 Do not redesign this as StrideSync taking over training-plan completion. StrideSync can provide actual run summaries, but Half_Ass_Training should decide how those runs map to the plan and should write only to its own progress state.
 
+Important architecture update: Half_Ass_Training may remain both a standalone training schedule app and the reference implementation for a future StrideSync Training tab/module. StrideSync is likely the final unified daily-use app, but the training system should still be treated as one domain model with two possible shells during migration:
+
+- Standalone Half_Ass_Training shell.
+- Embedded StrideSync Training tab shell.
+
+The goal is to avoid maintaining two divergent copies of the same training logic. During migration, keep Half_Ass_Training standalone and working, use it as the reference implementation, and build the StrideSync Training tab carefully from the same data model and behavior. Long term, either retire the standalone app once StrideSync fully replaces it, or extract shared `training-core` / `training-ui` modules so both shells use the same plan data, progress logic, matching logic, and UI components.
+
+## Long-Term Destination
+
+- StrideSync remains production-sensitive and owns actual run data.
+- Half_Ass_Training remains the reference owner of training schedule behavior while migration is underway.
+- StrideSync can gain a hidden, then user-facing, Training tab that uses the same training model and behavior.
+- GarminVault stays separate longer as the local Garmin file-processing and Garmin export/import utility.
+- The final decision can happen later:
+  - retire standalone Half_Ass_Training after the StrideSync Training tab fully replaces it, or
+  - extract shared training modules so both apps keep working from one implementation.
+
+## Dual-Shell Strategy
+
+There should be one training system with two possible shells:
+
+- Half_Ass_Training shell: standalone app for schedule, progress, and matching reference behavior.
+- StrideSync Training tab shell: embedded module for daily use beside actual StrideSync run data.
+
+Shared behavior should be designed around a training-core boundary:
+
+- plan data
+- date calculations
+- progress status model
+- planned-vs-actual matching
+- manual override semantics
+- review queue semantics
+
+Shared UI can be considered later as a training-ui boundary:
+
+- Today workout card
+- calendar badges
+- match panel
+- workout comparison
+- review queue
+
+Do not copy all routes, state, and components blindly into StrideSync. Each migration step should identify what belongs in shared training logic, what is shell-specific, and what must remain untouched in StrideSync.
+
+## Near-Term Safety
+
+- Keep Half_Ass_Training separate and usable during migration.
+- Use export/import contracts and preview flows as scaffolding.
+- Build StrideSync Training tab behind a hidden route/tab before exposing it.
+- Do not merge everything in one step.
+- Do not create a monorepo, shared package, or fourth app unless explicitly requested later.
+- Do not write training progress to Firestore until UI, matching, and manual confirmation are proven.
+- Do not duplicate training logic in two apps without a plan to retire one copy or extract shared modules.
+
 ## Role Split
 
 ### StrideSync
@@ -32,16 +85,19 @@ Do not redesign this as StrideSync taking over training-plan completion. StrideS
 
 ## Recommended Phase 5 Scope
 
-Phase 5 should move actual run summaries from StrideSync into Half_Ass_Training safely, without automatic completion.
+Phase 5 should establish StrideSync as a safe actual-run provider and begin a careful Training tab migration path, without automatic completion.
 
 Recommended scope:
 
-- Define a StrideSync actual-run-summary export contract.
+- Treat Phase 5A StrideSync actual-run-summary export contract as complete.
 - Prefer read-only manual export/import first.
-- Add a Half_Ass_Training actual-run-summary import preview.
+- Add a hidden StrideSync Training tab shell before moving user-facing training behavior.
+- Migrate static plan data and UI in small reviewed pieces.
+- Keep Half_Ass_Training standalone and use it as the reference implementation.
+- Add a Half_Ass_Training or StrideSync actual-run-summary import/preview only when the phase explicitly asks for it.
 - Validate shape, dates, distance, duration, source, and provider activity IDs.
-- Store nothing at first, or store only preview-local component state.
-- Do not write to Firebase or Firestore from Half_Ass_Training.
+- Store nothing at first, or store only preview-local state.
+- Do not write training progress to Firebase or Firestore yet.
 - Do not let Half_Ass_Training read Firebase directly yet.
 - Do not mark any planned workout complete automatically.
 - Do not mutate `ProgressState` until the user confirms in Phase 6.
@@ -120,7 +176,7 @@ type StrideSyncActualRunSummaryExportV1 = {
   sourceApp: 'StrideSync'
   athleteId?: string
   athleteLabel?: string
-  runs: ActualRunSummary[]
+  activities: ActualRunSummary[]
 }
 
 type ActualRunSummary = {
@@ -356,46 +412,97 @@ Likely files:
 - Preserve current localStorage progress behavior unless a later phase explicitly designs a migration.
 - Validate imported JSON before any persistence.
 - Keep all matching suggestions reversible.
+- Avoid dependency conflicts when moving Half_Ass_Training UI into StrideSync.
+- Avoid duplicated date logic between apps.
+- Avoid duplicate progress records when local StrideSync training state is later migrated to Firestore.
+- Avoid accidentally changing production StrideSync run data while building training features.
+- Avoid UI clutter in StrideSync; start hidden and promote gradually.
+- Avoid maintaining two divergent versions of the same training experience.
 
 ## Implementation Phases
 
 ### Phase 5A: StrideSync Actual Run Summary Export Contract
 
-Design and add a read-only StrideSync export contract for actual run summaries.
+Complete. StrideSync added and committed a read-only actual-run summary export contract and pure mapper.
+
+Completed branch/commit:
+
+- StrideSync branch: `codex/phase-5a-actual-run-summary-export`
+- Commit: `2a8463b Add actual run summary export contract`
 
 No Firestore writes. No Half_Ass_Training writes. No matching yet.
 
-### Phase 5B: Half_Ass_Training Manual Import Preview
+### Phase 5B: StrideSync Hidden Training Tab Shell
+
+Add a hidden Training tab/module shell inside StrideSync.
+
+No copied training logic yet beyond a placeholder shell. No Firestore progress writes. No dashboard or Strava sync changes.
+
+### Phase 5C: Migrate Static Training Plan Data Into StrideSync
+
+Move or copy the static plan data behind the hidden StrideSync Training tab in a reviewed, behavior-preserving way.
+
+Half_Ass_Training remains the reference implementation. Any copied plan data must match `src/data/trainingPlan.ts`.
+
+### Phase 5D: Migrate Training UI Components Carefully
+
+Move the core Training UI patterns into StrideSync behind the hidden Training tab.
+
+Review component dependencies, styling assumptions, icons, local state, and route expectations before copying anything.
+
+### Phase 5E: Local-Only Progress/Completion State Inside StrideSync
+
+Add local-only StrideSync Training progress state after the hidden UI is stable.
+
+This is not Firestore-backed yet. It should preserve Half_Ass_Training semantics and prepare for later migration.
+
+### Phase 6A: Planned-vs-Actual Match Preview Using StrideSync Runs
 
 Add a paste/upload preview for StrideSync actual run summary JSON.
 
 No localStorage writes yet. No progress mutation yet.
 
-### Phase 5C: Half_Ass_Training Read-Only Match Preview
-
 Run the matching engine in preview mode only.
 
-Show suggested matches, warnings, and confidence. Do not update `ProgressState`.
+Show suggested matches, warnings, and confidence beside planned workouts. Do not update progress yet.
 
-### Phase 6A: User-Confirmed Completion
+### Phase 6B: User-Confirmed Completion
 
-Allow the user to confirm a match and update Half_Ass_Training progress.
+Allow the user to confirm a match and update training progress in the active shell.
 
-Progress updates stay inside `src/hooks/useProgress.ts`.
+Manual confirmation should happen before any Firestore-backed progress is added.
 
-### Phase 6B: Review Queue And Manual Override
+### Phase 7: Firestore-Backed Training Progress
+
+After local-only progress and matching are proven, design Firestore-backed training progress for StrideSync.
+
+This phase must include auth, rules, user scoping, migrations, duplicate protection, and rollback thinking.
+
+### Phase 8A: Decide Whether To Retire Standalone Half_Ass_Training
+
+Once StrideSync Training fully covers the standalone app's core workflows, decide whether the standalone app should be retired.
+
+Retirement should happen only after real use confirms parity.
+
+### Phase 8B: Extract Shared Training Modules If Keeping Both
+
+If both shells should remain active, extract shared training-core/training-ui modules so the two apps use one implementation.
+
+Do not keep two divergent copies of plan data, progress logic, matching logic, or UI components.
+
+### Later: Review Queue And Manual Override
 
 Add review queue UI and persist manual override metadata.
 
 Protect manual decisions from future auto-matching.
 
-### Phase 6C: Optional Direct Read/API Integration Later
+### Later: Optional Direct Read/API Integration
 
 Consider a StrideSync read-only API/export endpoint after manual JSON is proven.
 
 Do not use direct Firebase reads until auth, rules, and user scoping are designed.
 
-### Phase 6D: Optional Progress Export Back Out
+### Later: Optional Progress Export Back Out
 
 Optionally export Half_Ass_Training progress as JSON for backup or reporting.
 
@@ -453,12 +560,38 @@ Do not make StrideSync the progress owner.
 - deploy config.
 - activity merge/deletion suppression behavior.
 - dashboard and detail behavior unrelated to actual-run summary export.
+- production run data persistence.
+- Strava sync request paths.
+- visible navigation unless a hidden Training tab phase explicitly asks for it.
 
 ### GarminVault
 
 - Garmin FIT decoding internals.
 - bulk FIT decode paths.
 - local Garmin summary parser behavior unless the phase explicitly asks for Garmin data changes.
+
+## What Should Not Happen
+
+- No full app merge in one step.
+- No direct copy-paste of all routes/state without review.
+- No Firestore training progress writes until UI and matching are proven.
+- No breaking current StrideSync dashboard behavior.
+- No changing Strava sync as part of Training tab migration.
+- No changing `RunActivity` persistence as part of Training tab migration.
+- No duplicated training logic that drifts between apps.
+- No monorepo/shared package conversion unless explicitly requested later.
+- No automatic app connection until contract previews and local-only behavior are proven.
+
+## Success Criteria
+
+- The Training module works inside StrideSync without breaking existing StrideSync dashboard/activity workflows.
+- Standalone Half_Ass_Training still works during migration.
+- Planned workouts can be shown beside actual StrideSync runs.
+- The user can confirm completion, partial completion, skip, missed, or manual completion.
+- Existing StrideSync activity data remains untouched.
+- The final architecture decision can be made later:
+  - retire standalone Half_Ass_Training, or
+  - extract shared `training-core` / `training-ui` modules and keep both shells.
 
 ## Verification Plan
 
