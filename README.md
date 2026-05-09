@@ -16,6 +16,20 @@ npm run lint
 npm run build
 ```
 
+## StrideSync Link
+
+The bottom navigation includes a `StrideSync` item so users can return to the StrideSync Training tab. Configure the destination with:
+
+```bash
+VITE_STRIDESYNC_URL=https://your-stridesync-url.example/?trainingTab=1
+```
+
+When `VITE_STRIDESYNC_URL` is not set, local development falls back to:
+
+```text
+http://localhost:5173/?trainingTab=1
+```
+
 ## Project Rules And Regression Guardrails
 
 Before starting new work, read:

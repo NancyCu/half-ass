@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Settings as SettingsIcon } from 'lucide-react'
 import { BottomNav, type Screen } from './components/BottomNav'
 import { WorkoutDetailSheet } from './components/WorkoutDetailSheet'
 import type { Workout } from './data/trainingPlan'
@@ -20,6 +21,9 @@ function App() {
 
   return (
     <div className="app-shell">
+      <button className="settings-fab" type="button" onClick={() => setScreen('settings')} aria-label="Open settings">
+        <SettingsIcon size={19} aria-hidden="true" />
+      </button>
       {screen === 'dashboard' ? (
         <Dashboard week1Start={settings.week1Start} progressApi={progressApi} onOpenWorkout={setSelectedWorkout} />
       ) : null}
