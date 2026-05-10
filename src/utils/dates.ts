@@ -39,7 +39,7 @@ export function formatFriendlyDate(date: Date) {
 }
 
 export function defaultWeek1Start() {
-  return toISODate(getMonday(new Date()))
+  return '2026-05-11'
 }
 
 export function raceDateFromWeek1(week1StartISO: string) {

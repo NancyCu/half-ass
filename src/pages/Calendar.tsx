@@ -6,7 +6,7 @@ import type { TrainingPlanProfile, WeekPlan, Workout } from '../data/trainingPla
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import type { useProgress } from '../hooks/useProgress'
 import { addDays, daysBetween, parseISODate, toISODate } from '../utils/dates'
-import { getCurrentWeekNumber, workoutDate } from '../utils/workouts'
+import { getCurrentWeekNumber, getPrePlanWorkoutForDate, workoutDate } from '../utils/workouts'
 
 type ProgressApi = ReturnType<typeof useProgress>
 type CalendarMode = 'week' | 'month' | 'block' | 'full'
@@ -40,11 +40,12 @@ function buildMonthDays(monthDate: Date, week1Start: string, workouts: Workout[]
   return Array.from({ length: 42 }, (_, index) => {
     const date = addDays(firstGridDate, index)
     const iso = toISODate(date)
+    const prePlanWorkout = getPrePlanWorkoutForDate(date, workouts)
     return {
       date,
       iso,
-      workout: workoutByISO.get(iso) ?? null,
-      inTrainingRange: daysBetween(firstPlanDate, date) >= 0 && daysBetween(date, lastPlanDate) >= 0,
+      workout: workoutByISO.get(iso) ?? prePlanWorkout,
+      inTrainingRange: Boolean(prePlanWorkout) || (daysBetween(firstPlanDate, date) >= 0 && daysBetween(date, lastPlanDate) >= 0),
       isToday: iso === todayISO,
     }
   })

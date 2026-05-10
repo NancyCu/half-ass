@@ -17,6 +17,8 @@ export type Workout = {
   notes: string
   phase: string
   weekLabel?: string
+  plannedDateKey?: string
+  isPrePlan?: boolean
 }
 
 export type WeekPlan = {

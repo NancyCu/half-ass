@@ -2,6 +2,9 @@ import { allWorkouts, trainingPlan, type WeekPlan, type Workout } from '../data/
 import { zoneTargets, zones, type Zone } from '../data/zones'
 import { addDays, daysBetween, formatFriendlyDate, parseISODate, toISODate } from './dates'
 
+const prePlanFoundationDateKeys = new Set(['2026-05-09', '2026-05-10'])
+const prePlanDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
 export type WorkoutSegment = {
   step: string
   zone: string
@@ -32,6 +35,7 @@ export function getWorkoutSegments(workout: Workout, targets = zoneTargets, zone
 }
 
 export function workoutDate(workout: Workout, week1StartISO: string) {
+  if (workout.plannedDateKey) return parseISODate(workout.plannedDateKey)
   return addDays(parseISODate(week1StartISO), (workout.week - 1) * 7 + (workout.day - 1))
 }
 
@@ -44,11 +48,39 @@ export function workoutISO(workout: Workout, week1StartISO: string) {
 }
 
 export function getWorkoutForDate(date: Date, week1StartISO: string, workouts: Workout[] = allWorkouts) {
+  const prePlanWorkout = getPrePlanWorkoutForDate(date, workouts)
+  if (prePlanWorkout) return prePlanWorkout
+
   const offset = daysBetween(parseISODate(week1StartISO), date)
   if (offset < 0 || offset >= workouts.length) return null
   const week = Math.floor(offset / 7) + 1
   const day = (offset % 7) + 1
   return workouts.find((workout) => workout.week === week && workout.day === day) ?? null
+}
+
+export function getPrePlanWorkoutForDate(date: Date, workouts: Workout[] = allWorkouts): Workout | null {
+  const dateKey = toISODate(date)
+  if (!prePlanFoundationDateKeys.has(dateKey)) return null
+
+  const template = workouts.find((workout) => (
+    workout.name === 'Foundation Run 5'
+    && workout.duration === '40 min'
+    && workout.type === 'foundation'
+  ))
+  if (!template) return null
+
+  return {
+    ...template,
+    id: `preplan-${dateKey}-foundation-run-5`,
+    week: 0,
+    day: 0,
+    dayName: prePlanDayNames[date.getDay()],
+    phase: 'Pre-plan',
+    weekLabel: undefined,
+    plannedDateKey: dateKey,
+    isPrePlan: true,
+    notes: `Pre-plan shakeout. ${template.notes}`,
+  }
 }
 
 export function getCurrentWeekNumber(week1StartISO: string, workouts: Workout[] = allWorkouts) {
@@ -100,10 +132,11 @@ export function getCurrentWeek(week1StartISO: string, plan: WeekPlan[] = trainin
 }
 
 export function copyWorkoutText(workout: Workout, week1StartISO: string) {
+  const planLabel = workout.isPrePlan ? `Pre-plan, ${workout.dayName}` : `Week ${workout.week}, ${workout.dayName}`
   return [
     workout.name,
     `Date: ${workoutDateLabel(workout, week1StartISO)}`,
-    `Week ${workout.week}, ${workout.dayName}`,
+    planLabel,
     `Time / Distance: ${workout.miles ? `${workout.miles} mi` : workout.duration}`,
     `Target HR: ${workout.targetBpm}`,
     `Target pace: ${workout.targetPace}`,
