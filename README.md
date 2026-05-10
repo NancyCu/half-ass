@@ -20,13 +20,13 @@ npm run build
 
 The bottom navigation includes a `StrideSync` item so users can return to the StrideSync Training tab. Configure the destination with `VITE_STRIDESYNC_URL`.
 
-For production deploys, set the return link to the main StrideSync app:
+For production deploys, set the return link to the hidden StrideSync Training tab:
 
 ```bash
-VITE_STRIDESYNC_URL=https://mikerun.web.app
+VITE_STRIDESYNC_URL=https://mikerun.web.app/?trainingTab=1
 ```
 
-The hidden StrideSync Training tab is migration scaffolding and is not the production destination yet. Half_Ass_Training remains the working standalone training app for now.
+Half_Ass_Training remains the working standalone training app for now, but the bottom-nav StrideSync item should land users directly in the hidden StrideSync Training tab while that migration surface is being tested.
 
 For mobile local testing of the hidden StrideSync Training shell, set:
 
