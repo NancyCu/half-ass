@@ -12,6 +12,19 @@ import { Progress } from './pages/Progress'
 import { Settings } from './pages/Settings'
 import { WorkoutLibrary } from './pages/WorkoutLibrary'
 import { Zones } from './pages/Zones'
+import { parseISODate } from './utils/dates'
+import { getWorkoutForDate } from './utils/workouts'
+
+type StrideSyncHandoff = {
+  date: string
+  error?: string
+  runDistance?: string
+  runDuration?: string
+  runName?: string
+  source?: string
+  workout: Workout | null
+  workoutName: string
+}
 
 function App() {
   const [screen, setScreen] = useState<Screen>('dashboard')
@@ -22,10 +35,24 @@ function App() {
   const activeZoneTargets = activeProfile.id === 'manny' ? mannyZoneTargets : zoneTargets
   const progressApi = useProgress(activeProfile.id, activeProfile.allWorkouts)
   const selectedProgress = selectedWorkout ? progressApi.progress.workouts[selectedWorkout.id] : undefined
+  const [handoff, setHandoff] = useState<StrideSyncHandoff | null>(() =>
+    readStrideSyncHandoff(activeProfile.allWorkouts, settings.week1Start),
+  )
 
   function switchPlan(planId: PlanId) {
     updateSettings({ planId })
     setSelectedWorkout(null)
+  }
+
+  function clearHandoff() {
+    cleanStrideSyncHandoffParams()
+    setHandoff(null)
+  }
+
+  function confirmHandoff() {
+    if (!handoff?.workout) return
+    progressApi.setStatus(handoff.workout.id, 'completed')
+    clearHandoff()
   }
 
   return (
@@ -33,6 +60,13 @@ function App() {
       <button className="settings-fab" type="button" onClick={() => setScreen('settings')} aria-label="Open settings">
         <SettingsIcon size={19} aria-hidden="true" />
       </button>
+      {handoff ? (
+        <StrideSyncHandoffPanel
+          handoff={handoff}
+          onConfirm={confirmHandoff}
+          onDismiss={clearHandoff}
+        />
+      ) : null}
       {screen === 'dashboard' ? (
         <Dashboard
           profile={activeProfile}
@@ -75,6 +109,95 @@ function App() {
         onToggleFlag={(flag) => selectedWorkout && progressApi.toggleFlag(selectedWorkout.id, flag)}
       />
     </div>
+  )
+}
+
+function readStrideSyncHandoff(workouts: Workout[], week1Start: string): StrideSyncHandoff | null {
+  if (typeof window === 'undefined') return null
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('source') !== 'stridesync' || params.get('action') !== 'completeWorkout') return null
+
+  const date = params.get('date') ?? ''
+  const workoutName = params.get('workoutName') ?? 'Workout'
+  const workout = date ? getWorkoutForDate(parseISODate(date), week1Start, workouts) : null
+  const namesMatch = !workout || !workoutName || normalizeName(workout.name) === normalizeName(workoutName)
+
+  return {
+    date,
+    error: workout && namesMatch ? undefined : 'Could not match this handoff to a planned workout.',
+    runDistance: params.get('runDistance') ?? undefined,
+    runDuration: params.get('runDuration') ?? undefined,
+    runName: params.get('runName') ?? undefined,
+    source: params.get('runSource') ?? undefined,
+    workout: workout && namesMatch ? workout : null,
+    workoutName,
+  }
+}
+
+function cleanStrideSyncHandoffParams() {
+  if (typeof window === 'undefined') return
+  const url = new URL(window.location.href)
+  for (const key of ['source', 'action', 'date', 'workoutId', 'workoutName', 'runName', 'runDistance', 'runDuration', 'runSource']) {
+    url.searchParams.delete(key)
+  }
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+}
+
+function normalizeName(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function formatOptionalMiles(value?: string) {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? `${numericValue.toFixed(2)} mi` : null
+}
+
+function formatOptionalMinutes(value?: string) {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? `${Math.round(numericValue)} min` : null
+}
+
+function StrideSyncHandoffPanel({
+  handoff,
+  onConfirm,
+  onDismiss,
+}: {
+  handoff: StrideSyncHandoff
+  onConfirm: () => void
+  onDismiss: () => void
+}) {
+  const runDetails = [
+    handoff.runName,
+    formatOptionalMiles(handoff.runDistance),
+    formatOptionalMinutes(handoff.runDuration),
+    handoff.source,
+  ].filter(Boolean)
+
+  return (
+    <section className="handoff-panel" role="status" aria-live="polite">
+      <p className="eyebrow">StrideSync handoff</p>
+      {handoff.error ? (
+        <>
+          <h2>Could not match this handoff</h2>
+          <p>{handoff.error}</p>
+          <p className="handoff-meta">{handoff.date} · {handoff.workoutName}</p>
+          <button className="secondary-button" type="button" onClick={onDismiss}>Dismiss</button>
+        </>
+      ) : (
+        <>
+          <h2>Mark {handoff.workout?.name ?? handoff.workoutName} complete from StrideSync?</h2>
+          <p>
+            Planned date: <strong>{handoff.date}</strong>
+            {runDetails.length ? <> · Matched run: <strong>{runDetails.join(' · ')}</strong></> : null}
+          </p>
+          <p className="handoff-meta">Nothing is completed until you confirm. This updates Half_Ass local progress only.</p>
+          <div className="button-row">
+            <button className="primary-button" type="button" onClick={onConfirm}>Mark complete</button>
+            <button className="secondary-button" type="button" onClick={onDismiss}>Dismiss</button>
+          </div>
+        </>
+      )}
+    </section>
   )
 }
 
