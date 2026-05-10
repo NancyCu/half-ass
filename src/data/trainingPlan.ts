@@ -535,7 +535,7 @@ const weeklyWorkouts: WorkoutInput[][] = [
 ]
 
 const mannyWeeklyWorkouts: WorkoutInput[][] = [
-  [mannyFoundation75, z1All(30), mannySpeedPlay(2, 5, 1, 'Z5'), mannyFoundation75, mannyFastFinish(2, 30, 20, 5), longRun(6, 4.5), mannyFoundation75],
+  [mannyFoundation75, z1All(30), mannySpeedPlay(2, 5, 1, 'Z5'), mannyFoundation75, mannyFastFinish(2, 30, 20, 5), easy(40, 30), mannyFoundation75],
   [mannyFoundation75, z1All(30), mannySpeedPlay(3, 4, 2, 'Z4'), mannyFoundation75, mannyFastFinish(3, 35, 20, 10), longRun(7, 5.5), mannyFoundation75],
   [mannyFoundation75, z1All(35), mannyHillReps(1, 6, '30 secs', '90 secs'), mannyFoundation75, mannyTempo(1, 15), longRun(8, 6.5), mannyFoundation75],
   [mannyFoundation75, z1All(35), mannySpeedPlay(4, 6, 1, 'Z5'), mannyFoundation75, mannyFastFinish(4, 40, 25, 10), longRun(9, 7.5), mannyFoundation75],
