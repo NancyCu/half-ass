@@ -1,5 +1,6 @@
 import type { WeekPlan, Workout } from '../data/trainingPlan'
 import type { ProgressState } from '../hooks/useProgress'
+import { effectiveWorkoutStatus } from '../lib/workoutProgress'
 import { WorkoutCard } from './WorkoutCard'
 
 export function WeekCard({
@@ -13,7 +14,7 @@ export function WeekCard({
   progress: ProgressState
   onOpenWorkout: (workout: Workout) => void
 }) {
-  const completed = week.days.filter((workout) => progress.workouts[workout.id]?.status === 'completed').length
+  const completed = week.days.filter((workout) => effectiveWorkoutStatus(progress.workouts[workout.id]) === 'completed').length
   const phaseClass = week.label === 'Race Week'
     ? 'race-week'
     : week.label === 'Recovery Week'
@@ -42,7 +43,7 @@ export function WeekCard({
             key={workout.id}
             workout={workout}
             week1Start={week1Start}
-            status={progress.workouts[workout.id]?.status}
+            status={effectiveWorkoutStatus(progress.workouts[workout.id])}
             onOpen={onOpenWorkout}
           />
         ))}

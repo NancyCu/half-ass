@@ -23,9 +23,11 @@ export function WorkoutDetailSheet({
   zones,
   status,
   note,
+  modificationSummary,
   selectedFlags,
   onClose,
   onStatus,
+  onSaveModification,
   onNote,
   onToggleFlag,
 }: {
@@ -35,14 +37,18 @@ export function WorkoutDetailSheet({
   zones: Zone[]
   status?: WorkoutStatus
   note?: string
+  modificationSummary?: string
   selectedFlags: PainFlag[]
   onClose: () => void
   onStatus: (status?: WorkoutStatus) => void
+  onSaveModification: (summary: string) => void
   onNote: (note: string) => void
   onToggleFlag: (flag: PainFlag) => void
 }) {
   const [introIndex, setIntroIndex] = useState<number | null>(null)
   const [introDone, setIntroDone] = useState(false)
+  const [isModifyOpen, setIsModifyOpen] = useState(false)
+  const [modificationDraft, setModificationDraft] = useState('')
   const [selectedSegment, setSelectedSegment] = useState<number | null>(null)
 
   const segments = useMemo(() => (workout ? getWorkoutSegments(workout, zoneTargets, zones) : []), [workout, zoneTargets, zones])
@@ -83,6 +89,13 @@ export function WorkoutDetailSheet({
     return () => window.clearTimeout(timeout)
   }, [selectedSegment])
 
+  useEffect(() => {
+    queueMicrotask(() => {
+      setIsModifyOpen(false)
+      setModificationDraft(modificationSummary ?? '')
+    })
+  }, [modificationSummary, workout?.id])
+
   if (!workout) return null
 
   const activeSegmentIndex = selectedSegment ?? introIndex
@@ -91,6 +104,7 @@ export function WorkoutDetailSheet({
   const displayedTargetPace = activeSegment?.targetPace ?? workout.targetPace
   const zoneClass = (zone: string) => zone.match(/Z[1-5]/)?.[0].toLowerCase() ?? 'z2'
   const activeTargetClass = activeSegment ? `target-sync active ${zoneClass(activeSegment.zone)}` : 'target-sync'
+  const hasModificationDiff = modificationDraft.trim() !== (modificationSummary ?? '').trim()
 
   return (
     <div className="sheet-backdrop" role="presentation" onClick={onClose}>
@@ -136,8 +150,44 @@ export function WorkoutDetailSheet({
             {status === 'completed' ? 'Undo Complete' : 'Complete Workout'}
           </button>
           <button className="secondary-button" type="button" onClick={() => onStatus('skipped')}>Skip</button>
-          <button className="secondary-button" type="button" onClick={() => onStatus('modified')}>Modify</button>
+          <button className="secondary-button" type="button" onClick={() => setIsModifyOpen(true)}>Modify</button>
         </div>
+        {isModifyOpen ? (
+          <section className="modify-panel" aria-label="Workout modification">
+            <label className="note-field">
+              <span>Modification saved to this workout</span>
+              <textarea
+                value={modificationDraft}
+                onChange={(event) => setModificationDraft(event.target.value)}
+                placeholder="What did you actually change? Example: swapped for 30 min bike, shortened to 25 min easy run."
+              />
+            </label>
+            <div className="button-row compact">
+              <button
+                className="primary-button"
+                type="button"
+                disabled={!modificationDraft.trim() || !hasModificationDiff}
+                onClick={() => {
+                  if (!modificationDraft.trim() || !hasModificationDiff) return
+                  onSaveModification(modificationDraft)
+                  setIsModifyOpen(false)
+                }}
+              >
+                Save modification
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => {
+                  setModificationDraft(modificationSummary ?? '')
+                  setIsModifyOpen(false)
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </section>
+        ) : null}
         <label className="note-field">
           <span>Run Notes</span>
           <textarea value={note ?? ''} onChange={(event) => onNote(event.target.value)} placeholder="Breathing, legs, pain, fuel, weather…" />

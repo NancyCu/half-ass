@@ -8,6 +8,7 @@
 - Calendar/plan views must stay readable and card-based on mobile.
 - Workout detail sheet must keep status, notes, flags, target HR, target pace, zones, segments, and Garmin helpers.
 - Progress must use `localStorage`; do not replace it with fake state.
+- Modified and completed workout states must stay separate: opening Modify alone must not write progress, no-op modified records must be ignored, and calendar green dots/counters must mean completed only.
 - Settings must preserve Week 1 start, race-date alignment, theme, import/export, and reset workflows.
 - Do not add backend/cloud sync or direct StrideSync writes without explicit approval.
 
@@ -62,6 +63,7 @@ When changing training data, review:
 When changing progress, review:
 
 - `src/hooks/useProgress.ts`
+- `src/lib/workoutProgress.ts`
 - `src/pages/Dashboard.tsx`
 - `src/pages/Progress.tsx`
 - `src/components/WorkoutDetailSheet.tsx`

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { allWorkouts as defaultAllWorkouts, type PlanId, type Workout } from '../data/trainingPlan'
+import { isMeaningfullyModified } from '../lib/workoutProgress'
 
 const STORAGE_KEY = 'half_ass_training_progress_v1'
 
@@ -10,6 +11,10 @@ export type WorkoutProgress = {
   status?: WorkoutStatus
   note?: string
   flags?: PainFlag[]
+  modification?: {
+    savedAt: string
+    summary: string
+  }
   strideSyncHandoff?: {
     appliedAt: string
     identity: string
@@ -93,11 +98,24 @@ export function useProgress(planId: PlanId = 'mikey', workouts: Workout[] = defa
   }
 
   function setStatus(id: string, status?: WorkoutStatus) {
-    updateWorkout(id, { status, strideSyncHandoff: undefined })
+    updateWorkout(id, { status, modification: undefined, strideSyncHandoff: undefined })
   }
 
   function completeFromStrideSync(id: string, handoff: NonNullable<WorkoutProgress['strideSyncHandoff']>) {
-    updateWorkout(id, { status: 'completed', strideSyncHandoff: handoff })
+    updateWorkout(id, { status: 'completed', modification: undefined, strideSyncHandoff: handoff })
+  }
+
+  function saveModification(id: string, summary: string) {
+    const trimmedSummary = summary.trim()
+    if (!trimmedSummary) return
+    updateWorkout(id, {
+      status: 'modified',
+      modification: {
+        savedAt: new Date().toISOString(),
+        summary: trimmedSummary,
+      },
+      strideSyncHandoff: undefined,
+    })
   }
 
   function setNote(id: string, note: string) {
@@ -162,7 +180,7 @@ export function useProgress(planId: PlanId = 'mikey', workouts: Workout[] = defa
     const entries = Object.entries(progress.workouts)
     const completedIds = entries.filter(([, value]) => value.status === 'completed').map(([id]) => id)
     const skipped = entries.filter(([, value]) => value.status === 'skipped').length
-    const modified = entries.filter(([, value]) => value.status === 'modified').length
+    const modified = entries.filter(([, value]) => isMeaningfullyModified(value)).length
     const completedWorkouts = workouts.filter((workout) => completedIds.includes(workout.id))
     const longest = completedWorkouts.reduce((max, workout) => Math.max(max, workout.miles ?? 0), 0)
     const lastId = entries
@@ -186,6 +204,7 @@ export function useProgress(planId: PlanId = 'mikey', workouts: Workout[] = defa
     summary,
     setStatus,
     completeFromStrideSync,
+    saveModification,
     setNote,
     toggleFlag,
     addManualRun,

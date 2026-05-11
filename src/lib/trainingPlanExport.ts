@@ -1,4 +1,5 @@
 import type { ProgressState } from '../hooks/useProgress'
+import { effectiveWorkoutStatus } from './workoutProgress'
 import type { SettingsState } from '../hooks/useSettings'
 import type { WeekPlan, Workout } from '../data/trainingPlan'
 import type {
@@ -74,10 +75,10 @@ export function mapProgressToPlannedWorkoutProgress(progress?: ProgressState): P
   if (!progress) return undefined
 
   const rows = Object.entries(progress.workouts ?? {})
-    .filter(([, value]) => value.status || value.note || (value.flags?.length ?? 0) > 0)
+    .filter(([, value]) => effectiveWorkoutStatus(value) || value.note || (value.flags?.length ?? 0) > 0)
     .map(([plannedWorkoutId, value]) => ({
       plannedWorkoutId,
-      status: value.status,
+      status: effectiveWorkoutStatus(value),
       note: value.note,
       flags: value.flags ? [...value.flags] : undefined,
       updatedAt: value.updatedAt ?? '',

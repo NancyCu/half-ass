@@ -5,6 +5,7 @@ import { WorkoutDetailSheet } from './components/WorkoutDetailSheet'
 import { getTrainingPlanProfile, trainingPlanProfiles, type PlanId, type Workout } from './data/trainingPlan'
 import { mannyZoneTargets, mannyZones, zoneTargets, zones } from './data/zones'
 import { useProgress } from './hooks/useProgress'
+import { effectiveWorkoutStatus } from './lib/workoutProgress'
 import {
   cleanStrideSyncHandoffParamsFromUrl,
   formatStrideSyncHandoffRun,
@@ -32,6 +33,7 @@ function App() {
   const activeZoneTargets = activeProfile.id === 'manny' ? mannyZoneTargets : zoneTargets
   const progressApi = useProgress(activeProfile.id, activeProfile.allWorkouts)
   const selectedProgress = selectedWorkout ? progressApi.progress.workouts[selectedWorkout.id] : undefined
+  const selectedStatus = effectiveWorkoutStatus(selectedProgress)
   const [handoff, setHandoff] = useState<StrideSyncHandoff | null>(() =>
     typeof window === 'undefined' ? null : readStrideSyncHandoffFromSearch(window.location.search, activeProfile.allWorkouts, settings.week1Start),
   )
@@ -154,11 +156,13 @@ function App() {
         week1Start={settings.week1Start}
         zoneTargets={activeZoneTargets}
         zones={activeZones}
-        status={selectedProgress?.status}
+        status={selectedStatus}
         note={selectedProgress?.note}
+        modificationSummary={selectedProgress?.modification?.summary}
         selectedFlags={selectedProgress?.flags ?? []}
         onClose={() => setSelectedWorkout(null)}
         onStatus={(status) => selectedWorkout && progressApi.setStatus(selectedWorkout.id, status)}
+        onSaveModification={(summary) => selectedWorkout && progressApi.saveModification(selectedWorkout.id, summary)}
         onNote={(note) => selectedWorkout && progressApi.setNote(selectedWorkout.id, note)}
         onToggleFlag={(flag) => selectedWorkout && progressApi.toggleFlag(selectedWorkout.id, flag)}
       />

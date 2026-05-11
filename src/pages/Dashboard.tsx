@@ -5,6 +5,7 @@ import { ZoneChips } from '../components/ZoneChips'
 import type { TrainingPlanProfile, WeekPlan, Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import type { ManualRunEntry, useProgress } from '../hooks/useProgress'
+import { effectiveWorkoutStatus } from '../lib/workoutProgress'
 import { getMonday, parseISODate, toISODate } from '../utils/dates'
 import { getCurrentWeek, getPlanTiming, getWorkoutForDate, workoutDateLabel } from '../utils/workouts'
 
@@ -130,17 +131,18 @@ export function Dashboard({
   const activePhase = focusedPhase ?? currentWeek.phase
   const todayLibrary = getWorkoutLibraryEntry(today.type)
   const todayProgress = progressApi.progress.workouts[today.id]
-  const weeklyDone = currentWeek.days.filter((workout) => progressApi.progress.workouts[workout.id]?.status === 'completed').length
+  const todayStatus = effectiveWorkoutStatus(todayProgress)
+  const weeklyDone = currentWeek.days.filter((workout) => effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) === 'completed').length
   const weeklyMiles = estimatedWeekMiles(currentWeek.days)
   const weeklyLongRun = currentWeek.days.find((workout) => isLongWorkout(workout))
   const weeklyQuality = currentWeek.days.filter((workout) => isQualityWorkout(workout)).length
   const compactDate = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())
-  const completedWorkouts = allWorkouts.filter((workout) => progressApi.progress.workouts[workout.id]?.status === 'completed')
+  const completedWorkouts = allWorkouts.filter((workout) => effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) === 'completed')
   const completedLoad = completedWorkouts.reduce((total, workout) => total + workoutLoad(workout), 0)
   const plannedLoad = allWorkouts.reduce((total, workout) => total + workoutLoad(workout), 0)
   const currentWeekLoad = currentWeek.days.reduce((total, workout) => total + workoutLoad(workout), 0)
   const completedWeekLoad = currentWeek.days
-    .filter((workout) => progressApi.progress.workouts[workout.id]?.status === 'completed')
+    .filter((workout) => effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) === 'completed')
     .reduce((total, workout) => total + workoutLoad(workout), 0)
   const manualRunsThisWeek = (progressApi.progress.manualRuns ?? []).filter((run) => isWithinRange(run.date, weekStartISO, todayISO))
   const manualWeekMiles = manualRunsThisWeek.reduce((total, run) => total + run.distanceMiles, 0)
@@ -152,7 +154,7 @@ export function Dashboard({
     modified: progressApi.summary.modified,
     skipped: progressApi.summary.skipped,
   }
-  const loggedTotal = statusCounts.completed + statusCounts.modified + statusCounts.skipped
+  const loggedTotal = statusCounts.completed + statusCounts.skipped
   const upcomingCount = Math.max(allWorkouts.length - loggedTotal, 0)
   const phaseGroups = trainingPlan.reduce<Record<string, WeekPlan[]>>((groups, week) => {
     groups[week.phase] = [...(groups[week.phase] ?? []), week]
@@ -260,7 +262,7 @@ export function Dashboard({
               </div>
               <div className="day-drill-chart" aria-label={`Week ${selectedWeek.week} day drilldown`}>
                 {selectedWeek.days.map((workout) => {
-                  const status = progressApi.progress.workouts[workout.id]?.status
+                  const status = effectiveWorkoutStatus(progressApi.progress.workouts[workout.id])
                   const height = status === 'completed' ? 100 : status === 'modified' ? 72 : status === 'skipped' ? 34 : 16
                   return (
                     <button className={status ? `day-drill-bar ${status}` : 'day-drill-bar'} key={workout.id} type="button" onClick={() => onOpenWorkout(workout)}>
@@ -274,7 +276,7 @@ export function Dashboard({
             </article>
           ) : focusedPhase === 'all' ? (
             Object.entries(phaseGroups).map(([phase, weeks]) => {
-              const completed = weeks.flatMap((week) => week.days).filter((workout) => progressApi.progress.workouts[workout.id]?.status === 'completed').length
+              const completed = weeks.flatMap((week) => week.days).filter((workout) => effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) === 'completed').length
               const total = weeks.length * 7
               const phaseName = phase.replace(' Phase', '')
               return (
@@ -301,7 +303,7 @@ export function Dashboard({
               </div>
               <div className="phase-week-grid" aria-label={`${activePhase} weekly completion chart`}>
                 {activePhaseWeeks.map((week) => {
-                  const weekDone = week.days.filter((workout) => progressApi.progress.workouts[workout.id]?.status === 'completed').length
+                  const weekDone = week.days.filter((workout) => effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) === 'completed').length
                   const weekPercent = Math.round((weekDone / 7) * 100)
                   return (
                     <button className={week.week === activeWeekNumber ? 'phase-week-tile current' : 'phase-week-tile'} key={week.week} type="button" onClick={() => setDrillWeek(week.week)}>
@@ -325,7 +327,7 @@ export function Dashboard({
       <button className={`dashboard-workout-tile ${todayLibrary.color}`} type="button" onClick={() => onOpenWorkout(today)}>
         <span className="workout-tile-topline">
           <span>{workoutTileLabel}</span>
-          {todayProgress?.status ? <em className={`status-pill ${todayProgress.status}`}>{todayProgress.status}</em> : <em>Tap for details</em>}
+          {todayStatus ? <em className={`status-pill ${todayStatus}`}>{todayStatus}</em> : <em>Tap for details</em>}
         </span>
         <strong>{today.name}</strong>
         <span className="workout-tile-quick-facts">
@@ -414,7 +416,7 @@ export function Dashboard({
         </section>
         <div className="dashboard-day-list">
           {currentWeek.days.map((workout) => {
-            const status = progressApi.progress.workouts[workout.id]?.status
+            const status = effectiveWorkoutStatus(progressApi.progress.workouts[workout.id])
             const library = getWorkoutLibraryEntry(workout.type)
             const isTodayWorkout = isWorkoutToday && workout.id === today.id
             return (

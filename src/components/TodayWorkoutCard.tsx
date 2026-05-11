@@ -67,7 +67,6 @@ export function TodayWorkoutCard({
           {status === 'completed' ? 'Undo Complete' : 'Complete Workout'}
         </button>
         <button className="secondary-button" type="button" onClick={() => onStatus('skipped')}>Skip</button>
-        <button className="secondary-button" type="button" onClick={() => onStatus('modified')}>Modify</button>
       </div>
       <label className="note-field">
         <span>Run Notes</span>

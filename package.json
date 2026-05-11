@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:handoff": "npx tsx scripts/testStrideSyncHandoff.ts",
+    "test:progress": "npx tsx scripts/testWorkoutProgress.ts",
     "export:run-system:sample": "npx tsx scripts/exportRunSystemSample.ts"
   },
   "dependencies": {

@@ -1143,6 +1143,13 @@ input:focus {
     rgba(255, 255, 255, 0.04);
 }
 
+.month-day.modified {
+  border-color: rgba(255, 209, 92, 0.45);
+  background:
+    linear-gradient(145deg, rgba(255, 209, 92, 0.14), rgba(255, 255, 255, 0.05)),
+    rgba(255, 255, 255, 0.04);
+}
+
 .month-day:disabled {
   cursor: default;
 }
@@ -1211,6 +1218,26 @@ input:focus {
   border-radius: 999px;
   background: var(--green);
   box-shadow: 0 0 14px rgba(66, 247, 155, 0.72);
+}
+
+.month-status-mod {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 2;
+  border: 1px solid rgba(255, 209, 92, 0.58);
+  color: var(--gold);
+  background: rgba(5, 8, 18, 0.72);
+  box-shadow: 0 0 12px rgba(255, 209, 92, 0.24);
+}
+
+.modify-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 209, 92, 0.3);
+  border-radius: 18px;
+  background: rgba(255, 209, 92, 0.08);
 }
 
 .month-agenda,

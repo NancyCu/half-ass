@@ -2,6 +2,7 @@ import { RotateCcw } from 'lucide-react'
 import { ProgressSummary } from '../components/ProgressSummary'
 import type { TrainingPlanProfile, Workout } from '../data/trainingPlan'
 import type { useProgress } from '../hooks/useProgress'
+import { effectiveWorkoutStatus, hasVisibleWorkoutProgress } from '../lib/workoutProgress'
 import { getCurrentWeekNumber, workoutDateLabel } from '../utils/workouts'
 
 type ProgressApi = ReturnType<typeof useProgress>
@@ -18,7 +19,7 @@ export function Progress({
   onOpenWorkout: (workout: Workout) => void
 }) {
   const currentWeek = getCurrentWeekNumber(week1Start, profile.allWorkouts)
-  const touched = profile.allWorkouts.filter((workout) => progressApi.progress.workouts[workout.id])
+  const touched = profile.allWorkouts.filter((workout) => hasVisibleWorkoutProgress(progressApi.progress.workouts[workout.id]))
 
   function reset() {
     if (window.confirm('Reset workout progress, notes, and flags?')) {
@@ -43,11 +44,12 @@ export function Progress({
         {touched.length === 0 ? <p>No workouts logged yet.</p> : null}
         {touched.map((workout) => {
           const item = progressApi.progress.workouts[workout.id]
+          const status = effectiveWorkoutStatus(item)
           return (
             <article className="log-row" key={workout.id}>
               <button type="button" onClick={() => onOpenWorkout(workout)}>
                 <strong>{workout.name}</strong>
-                <span>{workoutDateLabel(workout, week1Start)} · {item.status ?? 'note'}</span>
+                <span>{workoutDateLabel(workout, week1Start)} · {status ?? 'note'}</span>
               </button>
               <textarea
                 aria-label={`Note for ${workout.name}`}
@@ -56,11 +58,10 @@ export function Progress({
                 onChange={(event) => progressApi.setNote(workout.id, event.target.value)}
               />
               <div className="button-row compact">
-                <button type="button" onClick={() => progressApi.setStatus(workout.id, item.status === 'completed' ? undefined : 'completed')}>
-                  {item.status === 'completed' ? 'Undo' : 'Complete'}
+                <button type="button" onClick={() => progressApi.setStatus(workout.id, status === 'completed' ? undefined : 'completed')}>
+                  {status === 'completed' ? 'Undo' : 'Complete'}
                 </button>
                 <button type="button" onClick={() => progressApi.setStatus(workout.id, 'skipped')}>Skipped</button>
-                <button type="button" onClick={() => progressApi.setStatus(workout.id, 'modified')}>Modified</button>
               </div>
             </article>
           )

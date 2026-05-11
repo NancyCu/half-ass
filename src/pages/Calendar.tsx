@@ -5,6 +5,7 @@ import { ZoneChips } from '../components/ZoneChips'
 import type { TrainingPlanProfile, WeekPlan, Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import type { useProgress } from '../hooks/useProgress'
+import { effectiveWorkoutStatus } from '../lib/workoutProgress'
 import { addDays, daysBetween, parseISODate, toISODate } from '../utils/dates'
 import { getCurrentWeekNumber, getPrePlanWorkoutForDate, workoutDate } from '../utils/workouts'
 
@@ -90,7 +91,7 @@ function keyWorkout(week: WeekPlan) {
 }
 
 function completedCount(week: WeekPlan, progressApi: ProgressApi) {
-  return week.days.filter((workout) => progressApi.progress.workouts[workout.id]?.status === 'completed').length
+  return week.days.filter((workout) => effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) === 'completed').length
 }
 
 function isLongWorkout(workout: Workout) {
@@ -130,7 +131,7 @@ export function Calendar({
   )
   const blockWeeks = useMemo(() => trainingPlan.slice(currentBlock * 4, currentBlock * 4 + 4), [currentBlock, trainingPlan])
 
-  const completed = monthWorkouts.filter((day) => day.workout && progressApi.progress.workouts[day.workout.id]?.status === 'completed').length
+  const completed = monthWorkouts.filter((day) => day.workout && effectiveWorkoutStatus(progressApi.progress.workouts[day.workout.id]) === 'completed').length
   const longRuns = monthWorkouts.filter((day) => day.workout && isLongWorkout(day.workout)).length
   const totalMiles = monthWorkouts.reduce((sum, day) => sum + (day.workout?.miles ?? 0), 0)
   const todayMonth = monthKey(new Date())
@@ -183,7 +184,7 @@ export function Calendar({
               {monthDays.map((day) => {
                 const workout = day.workout
                 const library = workout ? getWorkoutLibraryEntry(workout.type) : null
-                const status = workout ? progressApi.progress.workouts[workout.id]?.status : undefined
+                const status = workout ? effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) : undefined
                 return (
                   <button
                     className={['month-day', day.date.getMonth() === visibleMonth.getMonth() ? '' : 'outside-month', day.isToday ? 'today' : '', library?.color ?? 'empty', status ?? ''].filter(Boolean).join(' ')}
@@ -196,7 +197,8 @@ export function Calendar({
                     {workout ? (
                       <>
                         <strong className="month-workout-name">{workout.name}</strong>
-                        {status ? <span className="month-status-dot" aria-label={status} /> : null}
+                        {status === 'completed' ? <span className="month-status-dot" aria-label={status} /> : null}
+                        {status === 'modified' ? <em className="month-status-mod">MOD</em> : null}
                       </>
                     ) : (
                       <span className="month-day-type">{day.inTrainingRange ? 'No run' : 'Open'}</span>
@@ -216,7 +218,7 @@ export function Calendar({
               if (!day.workout) return null
               const workout = day.workout
               const library = getWorkoutLibraryEntry(workout.type)
-              const status = progressApi.progress.workouts[workout.id]?.status
+              const status = effectiveWorkoutStatus(progressApi.progress.workouts[workout.id])
               return (
                 <button className={`month-agenda-card ${library.color}`} key={workout.id} type="button" onClick={() => onOpenWorkout(workout)}>
                   <span className="agenda-date">{new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(day.date)}</span>
@@ -269,7 +271,7 @@ export function Calendar({
                 <div className="block-day-list">
                   {week.days.map((workout) => {
                     const library = getWorkoutLibraryEntry(workout.type)
-                    const status = progressApi.progress.workouts[workout.id]?.status
+                    const status = effectiveWorkoutStatus(progressApi.progress.workouts[workout.id])
                     return (
                       <button className={`block-day-row ${library.color}`} key={workout.id} type="button" onClick={() => onOpenWorkout(workout)}>
                         <span className="block-day-date">{workout.dayName.slice(0, 3)}</span>
@@ -313,7 +315,7 @@ export function Calendar({
                   <span className="roadmap-meter" aria-label={`${completed} of 7 workouts done`}>
                     {week.days.map((workout) => {
                       const library = getWorkoutLibraryEntry(workout.type)
-                      const status = progressApi.progress.workouts[workout.id]?.status
+                      const status = effectiveWorkoutStatus(progressApi.progress.workouts[workout.id])
                       return <i className={`${library.color} ${status ?? ''}`} key={workout.id} />
                     })}
                   </span>
