@@ -194,6 +194,10 @@ h3,
   font-size: 13px;
 }
 
+.handoff-panel-compact {
+  border-color: rgba(23, 231, 255, 0.38);
+}
+
 .screen {
   display: grid;
   gap: 14px;
@@ -1670,6 +1674,42 @@ input:focus {
   margin: 0;
   color: var(--muted);
   font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.toggle-setting {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.toggle-setting input {
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  accent-color: var(--cyan);
+}
+
+.toggle-setting strong,
+.toggle-setting em {
+  display: block;
+}
+
+.toggle-setting strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.toggle-setting em {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-style: normal;
   line-height: 1.45;
 }
 

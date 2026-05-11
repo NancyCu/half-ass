@@ -7,6 +7,7 @@ const STORAGE_KEY = 'half_ass_training_settings_v1'
 export type ThemeMode = 'dark' | 'print'
 
 export type SettingsState = {
+  autoAcceptStrideSyncHandoffs: boolean
   planId: PlanId
   week1Start: string
   raceDate: string
@@ -16,6 +17,7 @@ export type SettingsState = {
 function defaultSettings(): SettingsState {
   const week1Start = defaultWeek1Start()
   return {
+    autoAcceptStrideSyncHandoffs: false,
     planId: 'mikey',
     week1Start,
     raceDate: raceDateFromWeek1(week1Start),

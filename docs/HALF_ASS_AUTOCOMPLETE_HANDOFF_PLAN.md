@@ -273,3 +273,54 @@ Integration smoke tests:
 - No direct localStorage writes from StrideSync into Half_Ass.
 - No Strava token, auth, or private provider data in URLs.
 - No auto-complete when the Half_Ass setting is off.
+
+## Phase 10B Implementation Notes
+
+Phase 10B adds the first local-only Half_Ass receiver implementation behind a browser-local setting:
+
+```text
+Auto-accept trusted StrideSync handoffs
+```
+
+The setting is persisted inside the existing Half_Ass settings key and defaults off:
+
+```text
+half_ass_training_settings_v1
+```
+
+Duplicate/idempotency receipts are stored under:
+
+```text
+halfass_stride_handoff_applied_v1
+```
+
+Implemented validation:
+
+- `source=stridesync`
+- `action=completeWorkout`
+- valid `YYYY-MM-DD` date
+- date resolves to one active-profile Half_Ass workout or supported pre-plan Foundation workout
+- `workoutName` matches the resolved workout name
+- `workoutId` matches the resolved workout id, with a compatibility alias for current pre-plan Foundation handoffs
+- `runName`, positive `runDistance`, positive `runDuration`, and `runSource` are present
+- existing `completed`, `skipped`, or `modified` status is not overwritten
+- duplicate handoff identities do not re-apply
+- the same run identity is not allowed to silently complete a different workout
+- optional `matchStatus` must be `likely_match` when present
+- optional `confidence` must be at least `80` when present
+- optional `matchedAt` or `handoffGeneratedAt` must be recent when present
+
+Known limitations:
+
+- Current StrideSync URLs may not include `runId`, `confidence`, `matchStatus`, `matchedAt`, or `handoffVersion` yet.
+- Phase 10B therefore treats those richer params as optional receiver checks, while still requiring exact date/workout matching and positive run metrics before auto-accept.
+- A later StrideSync phase, likely Phase 10D, should add stable `runId`, `matchStatus`, `confidence`, timestamp, and handoff version params to make the sender contract stronger.
+- Undo remains local. Clearing a workout removes the auto-accepted completion metadata from that workout entry, while the duplicate receipt stays in place so the same stale URL cannot immediately re-complete after undo.
+
+Guardrails preserved:
+
+- No Firebase or Firestore reads.
+- No Firebase or Firestore writes.
+- No shared Firestore progress.
+- No StrideSync runtime change.
+- No GarminVault touch.

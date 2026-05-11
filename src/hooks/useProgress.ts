@@ -10,6 +10,14 @@ export type WorkoutProgress = {
   status?: WorkoutStatus
   note?: string
   flags?: PainFlag[]
+  strideSyncHandoff?: {
+    appliedAt: string
+    identity: string
+    runDistance?: string
+    runDuration?: string
+    runName?: string
+    runSource?: string
+  }
   updatedAt?: string
 }
 
@@ -85,7 +93,11 @@ export function useProgress(planId: PlanId = 'mikey', workouts: Workout[] = defa
   }
 
   function setStatus(id: string, status?: WorkoutStatus) {
-    updateWorkout(id, { status })
+    updateWorkout(id, { status, strideSyncHandoff: undefined })
+  }
+
+  function completeFromStrideSync(id: string, handoff: NonNullable<WorkoutProgress['strideSyncHandoff']>) {
+    updateWorkout(id, { status: 'completed', strideSyncHandoff: handoff })
   }
 
   function setNote(id: string, note: string) {
@@ -173,6 +185,7 @@ export function useProgress(planId: PlanId = 'mikey', workouts: Workout[] = defa
     progress,
     summary,
     setStatus,
+    completeFromStrideSync,
     setNote,
     toggleFlag,
     addManualRun,

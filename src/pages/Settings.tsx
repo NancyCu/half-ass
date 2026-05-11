@@ -90,6 +90,20 @@ export function Settings({
         <ThemeToggle theme={settings.theme} onChange={(theme) => updateSettings({ theme })} />
       </section>
       <section className="settings-panel">
+        <h2>StrideSync handoffs</h2>
+        <label className="toggle-setting">
+          <input
+            checked={settings.autoAcceptStrideSyncHandoffs}
+            type="checkbox"
+            onChange={(event) => updateSettings({ autoAcceptStrideSyncHandoffs: event.target.checked })}
+          />
+          <span>
+            <strong>Auto-accept trusted StrideSync handoffs</strong>
+            <em>Only handoffs from StrideSync with matching date/workout are applied automatically. Review-level or invalid handoffs still require confirmation.</em>
+          </span>
+        </label>
+      </section>
+      <section className="settings-panel">
         <h2>Data</h2>
         <div className="button-row">
           <button className="secondary-button" type="button" onClick={exportProgress}>
