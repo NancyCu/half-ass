@@ -55,6 +55,7 @@ When changing training data, review:
 - `src/data/trainingPlan.ts`
 - `src/data/workoutLibrary.ts`
 - `src/data/zones.ts`
+- `scripts/testPlanData.ts`
 - `src/pages/Dashboard.tsx`
 - `src/pages/Calendar.tsx`
 - `src/components/WorkoutCard.tsx`

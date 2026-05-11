@@ -64,7 +64,7 @@ export function getPrePlanWorkoutForDate(date: Date, workouts: Workout[] = allWo
 
   const template = workouts.find((workout) => (
     workout.name === 'Foundation Run 5'
-    && workout.duration === '40 min'
+    && workout.duration === '60 min'
     && workout.type === 'foundation'
   ))
   if (!template) return null

@@ -58,7 +58,7 @@ const z1CrossTrainNote = 'Optional cross-training is allowed only if it stays ea
 const foundationRunNumbers: Record<string, number> = {
   '30-20': 3,
   '35-25': 4,
-  '40-30': 5,
+  '60-50': 5,
   '45-35': 6,
 }
 
@@ -400,34 +400,34 @@ const offDay = timedWorkout(
 
 const weeklyWorkouts: WorkoutInput[][] = [
   [
-    easy(40, 30),
+    easy(60, 50),
     fastFinish(35, 20, 10),
-    easy(40, 30),
-    easy(40, 30),
+    easy(60, 50),
+    easy(60, 50),
     shortSpeed(33, 6, '1 min', '2 mins'),
-    easy(40, 30),
+    easy(60, 50),
     longRun(7, 5.5),
   ],
   [
-    easy(40, 30),
+    easy(60, 50),
     fastFinish(42, 25, 12),
     easy(45, 35),
-    easy(40, 30),
+    easy(60, 50),
     z4Intervals(35, 5, '2 mins', '2 mins'),
-    easy(40, 30),
+    easy(60, 50),
     longRun(8, 6.5),
   ],
   [
-    easy(40, 30),
+    easy(60, 50),
     fastFinish(40, 25, 10),
-    easy(40, 30),
-    easy(40, 30),
+    easy(60, 50),
+    easy(60, 50),
     shortSpeed(33, 6, '1 min', '2 mins'),
-    easy(40, 30),
+    easy(60, 50),
     longRun(6, 4.5),
   ],
   [
-    easy(40, 30),
+    easy(60, 50),
     fastFinish(40, 25, 10),
     z1All(45),
     easy(45, 35),
@@ -436,7 +436,7 @@ const weeklyWorkouts: WorkoutInput[][] = [
     longRun(10, 8.5),
   ],
   [
-    easy(40, 30),
+    easy(60, 50),
     fastFinish(42, 25, 12),
     z1All(45),
     easy(45, 35),
@@ -448,7 +448,7 @@ const weeklyWorkouts: WorkoutInput[][] = [
     z1All(40),
     fastFinish(40, 25, 10),
     z1All(40),
-    easy(40, 30),
+    easy(60, 50),
     shortSpeed(35, 10, '30 secs', '90 secs', true),
     z1All(40),
     longRun(8, 6.5),
@@ -537,7 +537,7 @@ const weeklyWorkouts: WorkoutInput[][] = [
 ]
 
 const mannyWeeklyWorkouts: WorkoutInput[][] = [
-  [mannyFoundation75, z1All(30), mannySpeedPlay(2, 5, 1, 'Z5'), mannyFoundation75, mannyFastFinish(2, 30, 20, 5), easy(40, 30), mannyFoundation75],
+  [mannyFoundation75, z1All(30), mannySpeedPlay(2, 5, 1, 'Z5'), mannyFoundation75, mannyFastFinish(2, 30, 20, 5), easy(60, 50), mannyFoundation75],
   [mannyFoundation75, z1All(30), mannySpeedPlay(3, 4, 2, 'Z4'), mannyFoundation75, mannyFastFinish(3, 35, 20, 10), longRun(7, 5.5), mannyFoundation75],
   [mannyFoundation75, z1All(35), mannyHillReps(1, 6, '30 secs', '90 secs'), mannyFoundation75, mannyTempo(1, 15), longRun(8, 6.5), mannyFoundation75],
   [mannyFoundation75, z1All(35), mannySpeedPlay(4, 6, 1, 'Z5'), mannyFoundation75, mannyFastFinish(4, 40, 25, 10), longRun(9, 7.5), mannyFoundation75],
