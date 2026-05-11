@@ -5,6 +5,8 @@ import { getWorkoutForDate, workoutISO } from '../utils/workouts'
 
 export const STRIDESYNC_HANDOFF_APPLIED_STORAGE_KEY = 'halfass_stride_handoff_applied_v1'
 export const STRIDESYNC_HANDOFF_HISTORY_STORAGE_KEY = 'halfass_stride_handoff_history_v1'
+const AUTO_ACCEPT_V2_VERSION = '2'
+const AUTO_ACCEPT_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
 const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/
 
@@ -57,6 +59,7 @@ export type StrideSyncHandoffHistoryState = {
 export type AppliedStrideSyncHandoff = {
   completedAt: string
   date: string
+  handoffId?: string
   identity: string
   planId: PlanId
   runIdentity: string
@@ -88,6 +91,15 @@ export function readStrideSyncHandoffFromSearch(search: string, workouts: Workou
   const autoAcceptBlockReason = getManualBlockReason({
     date,
     dateMatches,
+    handoffVersion: params.get('handoffVersion') ?? undefined,
+    handoffId: params.get('handoffId') ?? undefined,
+    matchedAt: params.get('matchedAt') ?? params.get('handoffGeneratedAt') ?? undefined,
+    matchStatus: params.get('matchStatus') ?? undefined,
+    confidence: params.get('confidence') ?? undefined,
+    runDistance: params.get('runDistance') ?? undefined,
+    runDuration: params.get('runDuration') ?? undefined,
+    runName: params.get('runName') ?? undefined,
+    runSource: params.get('runSource') ?? undefined,
     hasWorkoutLocator: Boolean(workoutId || rawWorkoutName),
     idsMatch,
     namesMatch,
@@ -137,6 +149,9 @@ export function validateStrideSyncAutoAccept(
     week1Start: string
   },
 ): AutoAcceptValidationResult {
+  if (handoff.handoffVersion !== AUTO_ACCEPT_V2_VERSION) {
+    return { status: 'blocked', reason: 'Auto-accept blocked: handoffVersion=2 required' }
+  }
   if (!handoff.workout) return { status: 'blocked', reason: handoff.autoAcceptBlockReason ?? 'Auto-accept blocked: workout mismatch' }
   if (handoff.autoAcceptBlockReason) return { status: 'blocked', reason: handoff.autoAcceptBlockReason }
   if (options.currentProgress?.status === 'completed') return { status: 'already_applied', reason: 'Already completed from StrideSync.' }
@@ -147,17 +162,16 @@ export function validateStrideSyncAutoAccept(
   if (!isPositiveNumber(handoff.runDistance) || !isPositiveNumber(handoff.runDuration)) {
     return { status: 'blocked', reason: 'Auto-accept blocked: missing required run data' }
   }
-  if (handoff.matchStatus && handoff.matchStatus !== 'likely_match') {
-    return { status: 'blocked', reason: 'Auto-accept blocked: review-level match' }
+  if (handoff.matchStatus !== 'likely_match') {
+    return { status: 'blocked', reason: 'Auto-accept blocked: wrong matchStatus' }
   }
-  if (handoff.confidence) {
-    const confidence = Number(handoff.confidence)
-    if (!Number.isFinite(confidence) || confidence < 80) {
-      return { status: 'blocked', reason: 'Auto-accept blocked: review-level match' }
-    }
+  const confidence = Number(handoff.confidence)
+  if (!Number.isFinite(confidence) || confidence < 80) {
+    return { status: 'blocked', reason: 'Auto-accept blocked: low confidence' }
   }
-  if (handoff.matchedAt && isStaleTimestamp(handoff.matchedAt)) return { status: 'blocked', reason: 'Auto-accept blocked: stale handoff' }
-  if (options.appliedState.handoffs[handoff.identity]) return { status: 'already_applied', reason: 'Already applied from StrideSync.' }
+  if (!handoff.handoffId?.trim()) return { status: 'blocked', reason: 'Auto-accept blocked: missing handoffId' }
+  if (!handoff.matchedAt || isStaleTimestamp(handoff.matchedAt)) return { status: 'blocked', reason: 'Auto-accept blocked: stale matchedAt' }
+  if (hasAppliedStrideSyncHandoff(options.appliedState, handoff)) return { status: 'already_applied', reason: 'Already applied from StrideSync.' }
 
   const runIdentity = getRunIdentity(handoff)
   const duplicateRun = Object.values(options.appliedState.handoffs).find((entry) => (
@@ -193,9 +207,10 @@ export function rememberAppliedStrideSyncHandoff(
 ) {
   if (!handoff.workout) return
   const current = readAppliedStrideSyncHandoffs(storage)
-  current.handoffs[handoff.identity] = {
+  current.handoffs[getAppliedHandoffKey(handoff)] = {
     completedAt,
     date: handoff.date,
+    handoffId: handoff.handoffId,
     identity: handoff.identity,
     planId,
     runIdentity: getRunIdentity(handoff),
@@ -306,6 +321,15 @@ function resolveWorkoutForHandoff(date: string, workouts: Workout[], week1Start:
 function getManualBlockReason({
   date,
   dateMatches,
+  handoffVersion,
+  handoffId,
+  matchedAt,
+  matchStatus,
+  confidence,
+  runDistance,
+  runDuration,
+  runName,
+  runSource,
   hasWorkoutLocator,
   idsMatch,
   namesMatch,
@@ -313,17 +337,54 @@ function getManualBlockReason({
 }: {
   date: string
   dateMatches: boolean
+  handoffVersion?: string
+  handoffId?: string
+  matchedAt?: string
+  matchStatus?: string
+  confidence?: string
+  runDistance?: string
+  runDuration?: string
+  runName?: string
+  runSource?: string
   hasWorkoutLocator: boolean
   idsMatch: boolean
   namesMatch: boolean
   workout: Workout | null
 }) {
+  if (handoffVersion === AUTO_ACCEPT_V2_VERSION) {
+    if (!handoffId?.trim()) return 'Auto-accept blocked: missing handoffId'
+    if (!runName?.trim() || !runSource?.trim() || !isPositiveNumber(runDistance) || !isPositiveNumber(runDuration)) {
+      return 'Auto-accept blocked: missing required run data'
+    }
+    if (!matchStatus?.trim()) return 'Auto-accept blocked: wrong matchStatus'
+    if (matchStatus !== 'likely_match') return 'Auto-accept blocked: wrong matchStatus'
+    const numericConfidence = Number(confidence)
+    if (!Number.isFinite(numericConfidence) || numericConfidence < 80) return 'Auto-accept blocked: low confidence'
+    if (!matchedAt || isStaleTimestamp(matchedAt)) return 'Auto-accept blocked: stale matchedAt'
+  }
   if (!isoDatePattern.test(date)) return 'Auto-accept blocked: wrong date'
   if (!workout) return 'Auto-accept blocked: wrong date'
   if (!dateMatches) return 'Auto-accept blocked: wrong date'
   if (!hasWorkoutLocator) return 'Auto-accept blocked: workout mismatch'
   if (!idsMatch || !namesMatch) return 'Auto-accept blocked: workout mismatch'
   return undefined
+}
+
+function getAppliedHandoffKey(handoff: Pick<StrideSyncHandoff, 'handoffId' | 'handoffVersion' | 'identity'>) {
+  return handoff.handoffVersion === AUTO_ACCEPT_V2_VERSION && handoff.handoffId?.trim()
+    ? handoff.handoffId
+    : handoff.identity
+}
+
+function hasAppliedStrideSyncHandoff(
+  appliedState: AppliedStrideSyncHandoffState,
+  handoff: Pick<StrideSyncHandoff, 'handoffId' | 'handoffVersion' | 'identity'>,
+) {
+  const primaryKey = getAppliedHandoffKey(handoff)
+  if (appliedState.handoffs[primaryKey]) return true
+  return handoff.handoffVersion === AUTO_ACCEPT_V2_VERSION
+    ? Object.values(appliedState.handoffs).some((entry) => entry.handoffId === handoff.handoffId)
+    : false
 }
 
 function buildStrideSyncHandoffIdentity({
@@ -377,7 +438,7 @@ function isPositiveNumber(value?: string) {
 function isStaleTimestamp(value: string) {
   const timestamp = Date.parse(value)
   if (!Number.isFinite(timestamp)) return true
-  return Date.now() - timestamp > 24 * 60 * 60 * 1000
+  return Date.now() - timestamp > AUTO_ACCEPT_MAX_AGE_MS
 }
 
 function isSupportedPrePlanIdAlias(workoutId: string, rawWorkoutId: string, date: string) {

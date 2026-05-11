@@ -370,3 +370,60 @@ Guardrails preserved:
 - No shared Firestore progress.
 - No StrideSync runtime change.
 - No GarminVault touch.
+
+## Phase 10E Notes
+
+Phase 10E hardens Half_Ass receiver-side auto-accept validation around the richer StrideSync sender contract introduced in Phase 10D. Auto-accept now requires:
+
+```text
+handoffVersion=2
+```
+
+Legacy handoffs without `handoffVersion=2` still open the normal manual confirmation path when the workout/date can be resolved safely, but they are no longer eligible for auto-accept.
+
+Required v2 auto-accept params:
+
+- `source=stridesync`
+- `action=completeWorkout`
+- valid `date`
+- `workoutId` or `workoutName`
+- `runName`
+- positive `runDistance`
+- positive `runDuration`
+- `runSource`
+- `handoffId`
+- `confidence`
+- `matchStatus`
+- `matchedAt`
+
+Required v2 auto-accept checks:
+
+- Half_Ass setting `Auto-accept trusted StrideSync handoffs` is on
+- `handoffVersion=2`
+- `matchStatus=likely_match`
+- `confidence >= 80`
+- `matchedAt` is recent
+- the active profile and `week1Start` resolve the date to the expected workout or supported pre-plan Foundation workout
+- `workoutId` / `workoutName` still match the resolved workout
+- the workout is not already completed, skipped, or modified
+- the same run identity has not already been used for a different workout
+- the same `handoffId` has not already been applied
+
+Phase 10E uses `handoffId` as the primary duplicate key for v2 handoffs. Legacy/no-version handoffs keep the older derived identity fallback for manual and backward-compatible duplicate handling.
+
+Chosen stale threshold:
+
+- `matchedAt` must be within 24 hours for auto-accept
+
+If a v2 handoff fails auto-accept validation, Half_Ass stays local-only and keeps the manual review path available when the workout itself can still be matched. Rejection history may record clear reasons such as:
+
+- missing `handoffId`
+- low confidence
+- wrong `matchStatus`
+- stale `matchedAt`
+- wrong date
+- workout mismatch
+- duplicate
+- already completed
+
+Phase 10E does not add Firebase or Firestore reads or writes, shared backend progress, or any sender-side StrideSync changes.

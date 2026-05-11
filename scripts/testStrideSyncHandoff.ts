@@ -41,11 +41,15 @@ class MemoryStorage implements Storage {
 
 const profile = getTrainingPlanProfile('mikey')
 const week1Start = '2026-05-11'
+const freshMatchedAt = new Date(Date.now() - (60 * 60 * 1000)).toISOString()
+const staleMatchedAt = new Date(Date.now() - (25 * 60 * 60 * 1000)).toISOString()
 
 function makeSearch(overrides: Record<string, string> = {}) {
   return new URLSearchParams({
     source: 'stridesync',
     action: 'completeWorkout',
+    handoffVersion: '2',
+    handoffId: 'handoff-1',
     date: '2026-05-11',
     workoutId: 'w1-d1',
     workoutName: 'Foundation Run 5',
@@ -53,6 +57,10 @@ function makeSearch(overrides: Record<string, string> = {}) {
     runDistance: '5.02',
     runDuration: '57',
     runSource: 'strava',
+    confidence: '86',
+    matchStatus: 'likely_match',
+    matchedAt: freshMatchedAt,
+    autoCompleted: 'true',
     ...overrides,
   }).toString()
 }
@@ -196,13 +204,45 @@ function validate(search: string, storage = new MemoryStorage(), currentStatus?:
 {
   const result = validate(makeSearch({ matchStatus: 'needs_review', confidence: '70' }))
   assert.equal(result.status, 'blocked')
-  assert.equal(result.reason, 'Auto-accept blocked: review-level match')
+  assert.equal(result.reason, 'Auto-accept blocked: wrong matchStatus')
 }
 
 {
   const result = validate(makeSearch({ confidence: 'not-a-number' }))
   assert.equal(result.status, 'blocked')
-  assert.equal(result.reason, 'Auto-accept blocked: review-level match')
+  assert.equal(result.reason, 'Auto-accept blocked: low confidence')
+}
+
+{
+  const result = validate(makeSearch({ confidence: '79' }))
+  assert.equal(result.status, 'blocked')
+  assert.equal(result.reason, 'Auto-accept blocked: low confidence')
+}
+
+{
+  const result = validate(makeSearch({ handoffId: '' }))
+  assert.equal(result.status, 'blocked')
+  assert.equal(result.reason, 'Auto-accept blocked: missing handoffId')
+}
+
+{
+  const result = validate(makeSearch({ matchedAt: staleMatchedAt }))
+  assert.equal(result.status, 'blocked')
+  assert.equal(result.reason, 'Auto-accept blocked: stale matchedAt')
+}
+
+{
+  const handoff = read(makeSearch({ autoCompleted: 'false' }))
+  assert.equal(handoff.autoCompleted, 'false')
+  const result = validate(makeSearch({ autoCompleted: 'false' }))
+  assert.equal(result.status, 'accepted')
+}
+
+{
+  const handoff = read(makeSearch({ autoCompleted: 'true' }))
+  assert.equal(handoff.autoCompleted, 'true')
+  const result = validate(makeSearch({ autoCompleted: 'true' }))
+  assert.equal(result.status, 'accepted')
 }
 
 {
@@ -212,6 +252,22 @@ function validate(search: string, storage = new MemoryStorage(), currentStatus?:
     workoutName: 'Foundation Run 5',
   }))
   assert.equal(result.status, 'accepted')
+}
+
+{
+  const result = validate(new URLSearchParams({
+    source: 'stridesync',
+    action: 'completeWorkout',
+    date: '2026-05-11',
+    workoutId: 'w1-d1',
+    workoutName: 'Foundation Run 5',
+    runName: 'Morning Run',
+    runDistance: '5.02',
+    runDuration: '57',
+    runSource: 'strava',
+  }).toString())
+  assert.equal(result.status, 'blocked')
+  assert.equal(result.reason, 'Auto-accept blocked: handoffVersion=2 required')
 }
 
 console.log('StrideSync handoff validation tests passed.')
