@@ -3,6 +3,7 @@ import { ThemeToggle } from '../components/ThemeToggle'
 import { trainingPlanProfiles, type PlanId, type TrainingPlanProfile } from '../data/trainingPlan'
 import type { useProgress } from '../hooks/useProgress'
 import type { SettingsState } from '../hooks/useSettings'
+import type { StrideSyncHandoffHistoryEntry } from '../lib/strideSyncHandoff'
 import { raceDateFromWeek1, week1FromRaceDate } from '../utils/dates'
 
 type ProgressApi = ReturnType<typeof useProgress>
@@ -13,6 +14,8 @@ export function Settings({
   resetSettings,
   progressApi,
   activeProfile,
+  automationHistory,
+  onClearAutomationHistory,
   onPlanChange,
 }: {
   settings: SettingsState
@@ -20,6 +23,8 @@ export function Settings({
   resetSettings: () => void
   progressApi: ProgressApi
   activeProfile: TrainingPlanProfile
+  automationHistory: StrideSyncHandoffHistoryEntry[]
+  onClearAutomationHistory: () => void
   onPlanChange: (planId: PlanId) => void
 }) {
   function exportProgress() {
@@ -102,6 +107,35 @@ export function Settings({
             <em>Only handoffs from StrideSync with matching date/workout are applied automatically. Review-level or invalid handoffs still require confirmation.</em>
           </span>
         </label>
+        <details className="automation-history">
+          <summary>
+            <span>
+              <strong>StrideSync automation history</strong>
+              <em>{automationHistory.length ? `${Math.min(automationHistory.length, 10)} recent receipt${automationHistory.length === 1 ? '' : 's'}` : 'No automation receipts yet'}</em>
+            </span>
+          </summary>
+          {automationHistory.length ? (
+            <>
+              <div className="automation-history-list">
+                {automationHistory.slice(0, 10).map((entry) => (
+                  <article className="automation-history-row" key={entry.id}>
+                    <div>
+                      <strong>{historyTitle(entry)}</strong>
+                      <span>{historyMeta(entry)}</span>
+                      {entry.reason ? <em>{entry.reason}</em> : null}
+                    </div>
+                    <span className={`automation-status-pill ${entry.status}`}>{historyStatus(entry)}</span>
+                  </article>
+                ))}
+              </div>
+              <button className="secondary-button full-width" type="button" onClick={onClearAutomationHistory}>
+                Clear automation history
+              </button>
+            </>
+          ) : (
+            <p className="settings-note">Receipts stay in this browser only and do not affect workout progress.</p>
+          )}
+        </details>
       </section>
       <section className="settings-panel">
         <h2>Data</h2>
@@ -118,4 +152,38 @@ export function Settings({
       </section>
     </main>
   )
+}
+
+function historyTitle(entry: StrideSyncHandoffHistoryEntry) {
+  const runName = entry.runName?.trim() || entry.workoutName
+  return entry.status === 'applied'
+    ? `Completed from StrideSync: ${runName}`
+    : `StrideSync handoff: ${runName}`
+}
+
+function historyMeta(entry: StrideSyncHandoffHistoryEntry) {
+  return [
+    entry.date,
+    formatMiles(entry.runDistance),
+    formatMinutes(entry.runDuration),
+    entry.runSource,
+  ].filter(Boolean).join(' · ')
+}
+
+function historyStatus(entry: StrideSyncHandoffHistoryEntry) {
+  if (entry.status === 'applied') return entry.mode === 'auto_accept' ? 'Auto accepted' : 'Manual'
+  if (entry.status === 'dismissed') return 'Dismissed'
+  if (entry.status === 'rejected') return 'Rejected'
+  if (entry.status === 'duplicate') return 'Duplicate'
+  return 'Undone'
+}
+
+function formatMiles(value?: string) {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? `${numericValue.toFixed(2)} mi` : null
+}
+
+function formatMinutes(value?: string) {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? `${Math.round(numericValue)} min` : null
 }

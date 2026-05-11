@@ -4,6 +4,7 @@ import { parseISODate, toISODate } from '../utils/dates'
 import { getWorkoutForDate, workoutISO } from '../utils/workouts'
 
 export const STRIDESYNC_HANDOFF_APPLIED_STORAGE_KEY = 'halfass_stride_handoff_applied_v1'
+export const STRIDESYNC_HANDOFF_HISTORY_STORAGE_KEY = 'halfass_stride_handoff_history_v1'
 
 const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/
 
@@ -13,6 +14,7 @@ export type StrideSyncHandoff = {
   confidence?: string
   date: string
   handoffVersion?: string
+  handoffId?: string
   matchedAt?: string
   matchStatus?: string
   rawWorkoutId?: string
@@ -27,6 +29,29 @@ export type StrideSyncHandoff = {
   autoAcceptBlockReason?: string
   error?: string
   identity: string
+}
+
+export type StrideSyncHandoffHistoryMode = 'auto_accept' | 'manual_confirm'
+export type StrideSyncHandoffHistoryStatus = 'applied' | 'dismissed' | 'rejected' | 'duplicate' | 'undone'
+
+export type StrideSyncHandoffHistoryEntry = {
+  id: string
+  acceptedAt: string
+  date: string
+  handoffId: string
+  mode: StrideSyncHandoffHistoryMode
+  reason?: string
+  runDistance?: string
+  runDuration?: string
+  runName?: string
+  runSource?: string
+  status: StrideSyncHandoffHistoryStatus
+  workoutId?: string
+  workoutName: string
+}
+
+export type StrideSyncHandoffHistoryState = {
+  entries: StrideSyncHandoffHistoryEntry[]
 }
 
 export type AppliedStrideSyncHandoff = {
@@ -77,6 +102,7 @@ export function readStrideSyncHandoffFromSearch(search: string, workouts: Workou
     confidence: params.get('confidence') ?? undefined,
     date,
     error: workout && dateMatches && namesMatch ? undefined : 'Could not match this handoff to a planned workout.',
+    handoffId: params.get('handoffId') ?? undefined,
     handoffVersion: params.get('handoffVersion') ?? undefined,
     identity: buildStrideSyncHandoffIdentity({
       date,
@@ -178,6 +204,64 @@ export function rememberAppliedStrideSyncHandoff(
   storage.setItem(STRIDESYNC_HANDOFF_APPLIED_STORAGE_KEY, JSON.stringify(current))
 }
 
+export function readStrideSyncHandoffHistory(storage: Storage): StrideSyncHandoffHistoryState {
+  try {
+    const raw = storage.getItem(STRIDESYNC_HANDOFF_HISTORY_STORAGE_KEY)
+    if (!raw) return { entries: [] }
+    const parsed = JSON.parse(raw) as Partial<StrideSyncHandoffHistoryState>
+    return { entries: Array.isArray(parsed.entries) ? parsed.entries.slice(0, 50) : [] }
+  } catch {
+    return { entries: [] }
+  }
+}
+
+export function recordStrideSyncHandoffHistory(
+  storage: Storage,
+  handoff: StrideSyncHandoff,
+  event: {
+    acceptedAt: string
+    mode: StrideSyncHandoffHistoryMode
+    reason?: string
+    status: StrideSyncHandoffHistoryStatus
+  },
+): boolean {
+  const handoffId = handoff.handoffId ?? handoff.identity
+  const id = [
+    handoffId,
+    event.mode,
+    event.status,
+    normalizeHandoffValue(event.reason ?? ''),
+  ].join('|')
+  const current = readStrideSyncHandoffHistory(storage)
+  const currentEntry = current.entries.find((item) => item.id === id)
+  const entry: StrideSyncHandoffHistoryEntry = {
+    id,
+    acceptedAt: currentEntry?.acceptedAt ?? event.acceptedAt,
+    date: handoff.date,
+    handoffId,
+    mode: event.mode,
+    reason: event.reason,
+    runDistance: handoff.runDistance,
+    runDuration: handoff.runDuration,
+    runName: handoff.runName,
+    runSource: handoff.runSource,
+    status: event.status,
+    workoutId: handoff.workout?.id ?? handoff.rawWorkoutId,
+    workoutName: handoff.workout?.name ?? handoff.workoutName,
+  }
+  const nextEntries = [
+    entry,
+    ...current.entries.filter((item) => item.id !== id),
+  ].slice(0, 50)
+  if (currentEntry && JSON.stringify(currentEntry) === JSON.stringify(entry)) return false
+  storage.setItem(STRIDESYNC_HANDOFF_HISTORY_STORAGE_KEY, JSON.stringify({ entries: nextEntries }))
+  return true
+}
+
+export function clearStrideSyncHandoffHistory(storage: Storage) {
+  storage.removeItem(STRIDESYNC_HANDOFF_HISTORY_STORAGE_KEY)
+}
+
 export function cleanStrideSyncHandoffParamsFromUrl(href: string) {
   const url = new URL(href)
   for (const key of [
@@ -186,6 +270,7 @@ export function cleanStrideSyncHandoffParamsFromUrl(href: string) {
     'confidence',
     'date',
     'handoffGeneratedAt',
+    'handoffId',
     'handoffVersion',
     'matchStatus',
     'matchedAt',

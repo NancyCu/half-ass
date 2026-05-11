@@ -8,9 +8,12 @@ import { useProgress } from './hooks/useProgress'
 import { effectiveWorkoutStatus } from './lib/workoutProgress'
 import {
   cleanStrideSyncHandoffParamsFromUrl,
+  clearStrideSyncHandoffHistory,
   formatStrideSyncHandoffRun,
+  readStrideSyncHandoffHistory,
   readAppliedStrideSyncHandoffs,
   readStrideSyncHandoffFromSearch,
+  recordStrideSyncHandoffHistory,
   rememberAppliedStrideSyncHandoff,
   type StrideSyncHandoff,
   validateStrideSyncAutoAccept,
@@ -26,7 +29,8 @@ import { Zones } from './pages/Zones'
 function App() {
   const [screen, setScreen] = useState<Screen>('dashboard')
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null)
-  const [handoffNotice, setHandoffNotice] = useState<string | null>(null)
+  const [handoffNotice, setHandoffNotice] = useState<HandoffNotice | null>(null)
+  const [, setHandoffHistoryVersion] = useState(0)
   const { settings, updateSettings, resetSettings } = useSettings()
   const activeProfile = getTrainingPlanProfile(settings.planId)
   const activeZones = activeProfile.id === 'manny' ? mannyZones : zones
@@ -37,6 +41,26 @@ function App() {
   const [handoff, setHandoff] = useState<StrideSyncHandoff | null>(() =>
     typeof window === 'undefined' ? null : readStrideSyncHandoffFromSearch(window.location.search, activeProfile.allWorkouts, settings.week1Start),
   )
+  const handoffHistory = typeof window === 'undefined'
+    ? []
+    : readStrideSyncHandoffHistory(window.localStorage).entries
+
+  function recordHandoffHistory(
+    nextHandoff: StrideSyncHandoff,
+    mode: 'auto_accept' | 'manual_confirm',
+    status: 'applied' | 'dismissed' | 'rejected' | 'duplicate',
+    reason?: string,
+    acceptedAt = new Date().toISOString(),
+  ) {
+    if (typeof window === 'undefined') return
+    const changed = recordStrideSyncHandoffHistory(window.localStorage, nextHandoff, {
+      acceptedAt,
+      mode,
+      reason,
+      status,
+    })
+    if (changed) setHandoffHistoryVersion((version) => version + 1)
+  }
 
   useEffect(() => {
     if (!handoff || !settings.autoAcceptStrideSyncHandoffs || typeof window === 'undefined') return
@@ -50,6 +74,16 @@ function App() {
 
     if (result.status === 'blocked') {
       queueMicrotask(() => {
+        recordHandoffHistory(handoff, 'manual_confirm', 'rejected', result.reason)
+        setHandoffNotice((current) => (
+          current?.title === 'StrideSync handoff needs review' && current.detail === result.reason
+            ? current
+            : {
+                detail: result.reason,
+                title: 'StrideSync handoff needs review',
+                tone: 'warning',
+              }
+        ))
         setHandoff((current) => (
           current && current.autoAcceptBlockReason !== result.reason
             ? { ...current, autoAcceptBlockReason: result.reason }
@@ -64,7 +98,12 @@ function App() {
       setHandoff(null)
 
       if (result.status === 'already_applied') {
-        setHandoffNotice(result.reason)
+        recordHandoffHistory(handoff, 'auto_accept', 'duplicate', result.reason)
+        setHandoffNotice({
+          detail: result.reason,
+          title: 'StrideSync handoff already handled',
+          tone: 'warning',
+        })
         return
       }
 
@@ -78,7 +117,12 @@ function App() {
         runSource: result.handoff.runSource,
       })
       rememberAppliedStrideSyncHandoff(window.localStorage, result.handoff, activeProfile.id, appliedAt)
-      setHandoffNotice(`Completed from StrideSync: ${formatStrideSyncHandoffRun(result.handoff)}`)
+      recordHandoffHistory(result.handoff, 'auto_accept', 'applied', undefined, appliedAt)
+      setHandoffNotice({
+        detail: formatStrideSyncHandoffRun(result.handoff),
+        title: 'Auto-completed from StrideSync',
+        tone: 'success',
+      })
     })
   }, [
     activeProfile.id,
@@ -93,15 +137,26 @@ function App() {
     setSelectedWorkout(null)
   }
 
-  function clearHandoff() {
+  function clearHandoff(recordDismissed = true) {
+    if (recordDismissed && handoff) {
+      recordHandoffHistory(handoff, 'manual_confirm', 'dismissed')
+    }
     cleanStrideSyncHandoffParams()
     setHandoff(null)
   }
 
   function confirmHandoff() {
     if (!handoff?.workout) return
+    recordHandoffHistory(handoff, 'manual_confirm', 'applied')
     progressApi.setStatus(handoff.workout.id, 'completed')
-    clearHandoff()
+    clearHandoff(false)
+  }
+
+  function clearAutomationHistory() {
+    if (typeof window === 'undefined') return
+    if (!window.confirm('Clear StrideSync automation history? Workout progress will not be changed.')) return
+    clearStrideSyncHandoffHistory(window.localStorage)
+    setHandoffHistoryVersion((version) => version + 1)
   }
 
   return (
@@ -117,9 +172,10 @@ function App() {
         />
       ) : null}
       {handoffNotice ? (
-        <section className="handoff-panel handoff-panel-compact" role="status" aria-live="polite">
+        <section className={`handoff-panel handoff-panel-compact ${handoffNotice.tone === 'warning' ? 'handoff-panel-warning' : ''}`} role="status" aria-live="polite">
           <p className="eyebrow">StrideSync handoff</p>
-          <h2>{handoffNotice}</h2>
+          <h2>{handoffNotice.title}</h2>
+          {handoffNotice.detail ? <p>{handoffNotice.detail}</p> : null}
           <button className="secondary-button" type="button" onClick={() => setHandoffNotice(null)}>Dismiss</button>
         </section>
       ) : null}
@@ -147,6 +203,8 @@ function App() {
           resetSettings={resetSettings}
           progressApi={progressApi}
           activeProfile={activeProfile}
+          automationHistory={handoffHistory}
+          onClearAutomationHistory={clearAutomationHistory}
           onPlanChange={switchPlan}
         />
       ) : null}
@@ -168,6 +226,12 @@ function App() {
       />
     </div>
   )
+}
+
+type HandoffNotice = {
+  detail?: string
+  title: string
+  tone: 'success' | 'warning'
 }
 
 function cleanStrideSyncHandoffParams() {

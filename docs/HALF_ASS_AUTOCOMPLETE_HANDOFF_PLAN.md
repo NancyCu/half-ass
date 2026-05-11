@@ -54,6 +54,18 @@ Half_Ass progress for Manny and any non-default plan:
 half_ass_training_progress_v1_<planId>
 ```
 
+Phase 10B duplicate protection:
+
+```text
+halfass_stride_handoff_applied_v1
+```
+
+Phase 10C local automation history:
+
+```text
+halfass_stride_handoff_history_v1
+```
+
 The current progress payload contains:
 
 ```ts
@@ -257,6 +269,40 @@ StrideSync unit tests:
 - Handoff URL omits private tokens and auth data.
 - `handoffId` is stable for the same run/workout/date/source.
 - Non-trusted matches do not advertise auto-accept eligibility.
+
+## Phase 10C Notes
+
+Phase 10C adds a local receipt trail for StrideSync handoff automation without changing the runtime contract between apps.
+
+Storage:
+
+```text
+halfass_stride_handoff_history_v1
+```
+
+Each receipt is compact and browser-local. Entries may include:
+
+- local receipt id and `handoffId` when supplied, otherwise the existing handoff identity
+- planned workout date
+- workout id or workout name
+- StrideSync run name, distance, duration, and source
+- accepted/recorded timestamp
+- mode: `auto_accept` or `manual_confirm`
+- status: `applied`, `dismissed`, `rejected`, `duplicate`, or `undone` if a safe undo event is available later
+- rejection reason for rejected handoffs
+
+Receipts must not store tokens, auth data, Strava credentials, Firebase identifiers, or anything sensitive. The history key is separate from:
+
+```text
+half_ass_training_settings_v1
+halfass_stride_handoff_applied_v1
+half_ass_training_progress_v1
+half_ass_training_progress_v1_<planId>
+```
+
+The Settings screen shows a compact "StrideSync automation history" section near the auto-accept toggle so the user can review what automation did recently. The optional clear control removes only `halfass_stride_handoff_history_v1`; it does not clear workout progress, duplicate protection, or settings.
+
+Phase 10C does not add Firestore/Firebase reads or writes, does not create shared Firestore progress, and does not require a StrideSync runtime change. StrideSync was not modified for this phase.
 
 Integration smoke tests:
 

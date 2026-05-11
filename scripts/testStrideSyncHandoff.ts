@@ -2,9 +2,12 @@ import assert from 'node:assert/strict'
 import { getTrainingPlanProfile } from '../src/data/trainingPlan'
 import {
   readAppliedStrideSyncHandoffs,
+  readStrideSyncHandoffHistory,
   readStrideSyncHandoffFromSearch,
+  recordStrideSyncHandoffHistory,
   rememberAppliedStrideSyncHandoff,
   STRIDESYNC_HANDOFF_APPLIED_STORAGE_KEY,
+  STRIDESYNC_HANDOFF_HISTORY_STORAGE_KEY,
   validateStrideSyncAutoAccept,
 } from '../src/lib/strideSyncHandoff'
 
@@ -72,6 +75,85 @@ function validate(search: string, storage = new MemoryStorage(), currentStatus?:
 {
   const result = validate(makeSearch())
   assert.equal(result.status, 'accepted')
+}
+
+{
+  const storage = new MemoryStorage()
+  const handoff = read(makeSearch({ handoffId: 'handoff-1' }))
+  recordStrideSyncHandoffHistory(storage, handoff, {
+    acceptedAt: '2026-05-11T12:00:00.000Z',
+    mode: 'auto_accept',
+    status: 'applied',
+  })
+  const history = readStrideSyncHandoffHistory(storage)
+  assert.equal(history.entries.length, 1)
+  assert.equal(history.entries[0].handoffId, 'handoff-1')
+  assert.equal(history.entries[0].mode, 'auto_accept')
+  assert.equal(history.entries[0].status, 'applied')
+  assert.equal(history.entries[0].runName, 'Morning Run')
+  assert.equal(history.entries[0].runDistance, '5.02')
+  assert.ok(storage.getItem(STRIDESYNC_HANDOFF_HISTORY_STORAGE_KEY))
+  assert.equal(storage.getItem(STRIDESYNC_HANDOFF_APPLIED_STORAGE_KEY), null)
+}
+
+{
+  const storage = new MemoryStorage()
+  const handoff = read(makeSearch({ handoffId: 'handoff-manual' }))
+  recordStrideSyncHandoffHistory(storage, handoff, {
+    acceptedAt: '2026-05-11T12:00:00.000Z',
+    mode: 'manual_confirm',
+    status: 'applied',
+  })
+  const [entry] = readStrideSyncHandoffHistory(storage).entries
+  assert.equal(entry.mode, 'manual_confirm')
+  assert.equal(entry.status, 'applied')
+}
+
+{
+  const storage = new MemoryStorage()
+  const handoff = read(makeSearch({ handoffId: 'handoff-dismissed' }))
+  recordStrideSyncHandoffHistory(storage, handoff, {
+    acceptedAt: '2026-05-11T12:00:00.000Z',
+    mode: 'manual_confirm',
+    status: 'dismissed',
+  })
+  const [entry] = readStrideSyncHandoffHistory(storage).entries
+  assert.equal(entry.status, 'dismissed')
+}
+
+{
+  const storage = new MemoryStorage()
+  const handoff = read(makeSearch({ handoffId: 'handoff-rejected', runDistance: '' }))
+  recordStrideSyncHandoffHistory(storage, handoff, {
+    acceptedAt: '2026-05-11T12:00:00.000Z',
+    mode: 'manual_confirm',
+    reason: 'Auto-accept blocked: missing required run data',
+    status: 'rejected',
+  })
+  const [entry] = readStrideSyncHandoffHistory(storage).entries
+  assert.equal(entry.status, 'rejected')
+  assert.equal(entry.reason, 'Auto-accept blocked: missing required run data')
+}
+
+{
+  const storage = new MemoryStorage()
+  const handoff = read(makeSearch({ handoffId: 'handoff-duplicate' }))
+  recordStrideSyncHandoffHistory(storage, handoff, {
+    acceptedAt: '2026-05-11T12:00:00.000Z',
+    mode: 'auto_accept',
+    reason: 'Already applied from StrideSync.',
+    status: 'duplicate',
+  })
+  recordStrideSyncHandoffHistory(storage, handoff, {
+    acceptedAt: '2026-05-11T12:05:00.000Z',
+    mode: 'auto_accept',
+    reason: 'Already applied from StrideSync.',
+    status: 'duplicate',
+  })
+  const history = readStrideSyncHandoffHistory(storage)
+  assert.equal(history.entries.length, 1)
+  assert.equal(history.entries[0].acceptedAt, '2026-05-11T12:00:00.000Z')
+  assert.equal(history.entries[0].status, 'duplicate')
 }
 
 {

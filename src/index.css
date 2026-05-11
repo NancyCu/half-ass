@@ -198,6 +198,14 @@ h3,
   border-color: rgba(23, 231, 255, 0.38);
 }
 
+.handoff-panel-warning {
+  border-color: rgba(255, 204, 102, 0.48);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(255, 204, 102, 0.16), transparent 55%),
+    linear-gradient(135deg, rgba(20, 14, 4, 0.95), rgba(13, 16, 33, 0.96));
+  box-shadow: var(--shadow), 0 0 28px rgba(255, 204, 102, 0.12);
+}
+
 .screen {
   display: grid;
   gap: 14px;
@@ -1738,6 +1746,88 @@ input:focus {
   font-size: 0.86rem;
   font-style: normal;
   line-height: 1.45;
+}
+
+.automation-history {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(23, 231, 255, 0.16);
+  border-radius: 18px;
+  background: rgba(5, 8, 18, 0.42);
+}
+
+.automation-history summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 850;
+}
+
+.automation-history summary span {
+  display: inline-grid;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.automation-history summary em,
+.automation-history-row span,
+.automation-history-row em {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: normal;
+  line-height: 1.35;
+}
+
+.automation-history[open] {
+  gap: 12px;
+}
+
+.automation-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.automation-history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.automation-history-row div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.automation-history-row strong {
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.automation-status-pill {
+  border-radius: 999px;
+  padding: 6px 8px;
+  color: #031014;
+  background: var(--cyan);
+  font-size: 0.68rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.automation-status-pill.rejected,
+.automation-status-pill.duplicate {
+  background: var(--gold);
+}
+
+.automation-status-pill.dismissed,
+.automation-status-pill.undone {
+  background: var(--gray);
 }
 
 .zone-card,
