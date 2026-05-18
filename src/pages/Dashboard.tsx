@@ -107,6 +107,7 @@ function scheduleBadgeFor(resolved: ResolvedAdjustedWorkout | null, assignedDate
   if (!adjustment) return null
   if (resolved?.isSkipped) return { className: 'skipped', label: 'Skipped' }
   if (resolved?.isCrossTraining) return { className: 'cross-train', label: 'Cross-train' }
+  if (adjustment.action === 'swapped') return { className: 'swapped', label: 'Swapped' }
   if (adjustment.action === 'moved' && adjustment.assignedDate === assignedDate) return { className: 'moved', label: 'Moved here' }
   if (adjustment.action === 'moved') return { className: 'moved', label: 'Moved' }
   return { className: 'adjusted', label: 'Adjusted' }

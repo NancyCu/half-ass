@@ -1299,6 +1299,13 @@ select:focus {
   background: rgba(23, 231, 255, 0.11);
 }
 
+.schedule-pill.swapped,
+.schedule-badge.swapped {
+  border-color: rgba(84, 193, 255, 0.52);
+  color: #bfe8ff;
+  background: rgba(84, 193, 255, 0.14);
+}
+
 .schedule-pill.cross-train,
 .schedule-badge.cross-train {
   border-color: rgba(143, 92, 255, 0.52);
@@ -1369,6 +1376,17 @@ select:focus {
   color: var(--muted);
   font-size: 12px;
   font-weight: 850;
+}
+
+.schedule-occupied-note {
+  margin: 0;
+  border: 1px solid rgba(84, 193, 255, 0.32);
+  border-radius: 14px;
+  padding: 10px;
+  color: #d6efff;
+  background: rgba(84, 193, 255, 0.08);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .guardrail-result {
@@ -2549,6 +2567,7 @@ dd {
 .dashboard-workout-tile.gray { --tile-tone: var(--gray); }
 .dashboard-workout-tile.schedule-skipped { opacity: 0.82; }
 .dashboard-workout-tile.schedule-cross-train { --tile-tone: var(--purple); }
+.dashboard-workout-tile.schedule-swapped { --tile-tone: #54c1ff; }
 .dashboard-workout-tile.schedule-moved,
 .dashboard-workout-tile.schedule-adjusted { --tile-tone: var(--cyan); }
 
@@ -2967,6 +2986,7 @@ dd {
 }
 
 .dashboard-day-row.schedule-cross-train { --tone: var(--purple); }
+.dashboard-day-row.schedule-swapped { --tone: #54c1ff; }
 .dashboard-day-row.schedule-moved,
 .dashboard-day-row.schedule-adjusted { --tone: var(--cyan); }
 

@@ -621,3 +621,15 @@ Phase 12E adds the first user-facing schedule adjustment MVP on top of the Phase
 - undo an active schedule adjustment conservatively
 
 The MVP intentionally defers full Swap UI and Repeat Week UI. It does not add StrideSync integration, Firestore/shared persistence, deployment behavior, or any change to Half_Ass auto-accept handoffs. The base plan remains immutable, and completed green dots remain tied only to progress completion state.
+
+## Phase 12F Implementation Notes
+
+Phase 12F removes the dead-end occupied-date move block in the local Half_Ass overlay UI. When a move target already has a workout assigned, the app now:
+
+- identifies the occupied workout on that target date
+- offers a swap flow instead of allowing same-day cramming
+- evaluates the resulting swapped schedule with the same hard/easy and long-run spacing guardrails
+- blocks unsafe swaps and allows safe or caution-level swaps after confirmation
+- stores the swap as paired local overlay records so undo from either side restores both workouts
+
+The app still does not allow two workouts on one date by default. Same-day cramming remains blocked, StrideSync integration remains deferred, and no Firestore/shared persistence was added in this phase.

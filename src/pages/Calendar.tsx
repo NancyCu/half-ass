@@ -201,6 +201,8 @@ export function Calendar({
                   ? 'Skipped'
                   : day.resolved?.isCrossTraining
                     ? 'Cross-train'
+                    : adjustment?.action === 'swapped'
+                      ? 'Swapped'
                     : adjustment?.action === 'moved' && adjustment.assignedDate === day.iso
                       ? 'Moved here'
                       : adjustment && adjustment.originalDate === day.iso
@@ -220,7 +222,7 @@ export function Calendar({
                         <strong className="month-workout-name">{workout.name}</strong>
                         {status === 'completed' ? <span className="month-status-dot" aria-label={status} /> : null}
                         {status === 'modified' ? <em className="month-status-mod">MOD</em> : null}
-                        {adjustmentBadge ? <em className={`schedule-badge ${day.resolved?.isSkipped ? 'skipped' : day.resolved?.isCrossTraining ? 'cross-train' : 'moved'}`}>{adjustmentBadge}</em> : null}
+                        {adjustmentBadge ? <em className={`schedule-badge ${day.resolved?.isSkipped ? 'skipped' : day.resolved?.isCrossTraining ? 'cross-train' : adjustment?.action === 'swapped' ? 'swapped' : 'moved'}`}>{adjustmentBadge}</em> : null}
                       </>
                     ) : (
                       <span className="month-day-type">{day.resolved?.adjustment?.action === 'moved' ? 'Moved' : day.inTrainingRange ? 'No run' : 'Open'}</span>
@@ -246,6 +248,8 @@ export function Calendar({
                 ? 'Skipped'
                 : day.resolved?.isCrossTraining
                   ? 'Cross-train'
+                  : adjustment?.action === 'swapped'
+                    ? 'Swapped'
                   : adjustment?.action === 'moved'
                     ? 'Moved here'
                     : null
@@ -262,7 +266,7 @@ export function Calendar({
                   </span>
                   <em>{workout.steps.slice(0, 2).join(' · ')}</em>
                   {status ? <span className={`status-pill ${status}`}>{status}</span> : null}
-                  {adjustmentBadge ? <span className={`schedule-pill ${day.resolved?.isSkipped ? 'skipped' : day.resolved?.isCrossTraining ? 'cross-train' : 'moved'}`}>{adjustmentBadge}</span> : null}
+                  {adjustmentBadge ? <span className={`schedule-pill ${day.resolved?.isSkipped ? 'skipped' : day.resolved?.isCrossTraining ? 'cross-train' : adjustment?.action === 'swapped' ? 'swapped' : 'moved'}`}>{adjustmentBadge}</span> : null}
                 </button>
               )
             })}

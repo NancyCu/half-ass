@@ -3,13 +3,16 @@ import { getTrainingPlanProfile, type WeekPlan, type Workout } from '../src/data
 import { effectiveWorkoutStatus } from '../src/lib/workoutProgress'
 import {
   addScheduleAdjustment,
+  addScheduleAdjustments,
   classifyWorkoutIntensity,
   clearScheduleAdjustments,
   evaluateScheduleAdjustment,
+  evaluateScheduleSwap,
   getActiveScheduleAdjustments,
   getAdjustedWeekSchedule,
   getMissedWorkoutRecommendation,
   getScheduleAdjustmentStorageKey,
+  getSwapTargetWorkout,
   readScheduleAdjustments,
   resolveAdjustedWorkoutForDate,
   undoScheduleAdjustment,
@@ -146,6 +149,7 @@ const swapWednesday = adjustment({
 })
 assert.equal(resolveAdjustedWorkoutForDate(profile.trainingPlan, '2026-05-11', [swapMonday, swapWednesday], week1Start).workout?.id, wednesdayFoundation.id)
 assert.equal(resolveAdjustedWorkoutForDate(profile.trainingPlan, '2026-05-13', [swapMonday, swapWednesday], week1Start).workout?.id, mondayFoundation.id)
+assert.notEqual(effectiveWorkoutStatus({}), 'completed', 'swapped workouts remain separate from completion status')
 
 const crossTrain = adjustment({
   id: 'cross-train-foundation',
@@ -172,6 +176,18 @@ assert.equal(resolveAdjustedWorkoutForDate(profile.trainingPlan, '2026-05-11', r
 clearScheduleAdjustments('mikey', undoStorage)
 assert.equal(readScheduleAdjustments('mikey', undoStorage).adjustments.length, 0)
 
+const swapUndoStorage = createMemoryStorage()
+const swapGroupId = 'swap-group-1'
+addScheduleAdjustments('mikey', [
+  { ...swapMonday, swapGroupId },
+  { ...swapWednesday, swapGroupId },
+], swapUndoStorage)
+assert.equal(getActiveScheduleAdjustments(readScheduleAdjustments('mikey', swapUndoStorage)).length, 2)
+undoScheduleAdjustment('mikey', swapMonday.id, swapUndoStorage)
+assert.equal(getActiveScheduleAdjustments(readScheduleAdjustments('mikey', swapUndoStorage)).length, 0)
+assert.equal(resolveAdjustedWorkoutForDate(profile.trainingPlan, '2026-05-11', readScheduleAdjustments('mikey', swapUndoStorage), week1Start).workout?.id, mondayFoundation.id)
+assert.equal(resolveAdjustedWorkoutForDate(profile.trainingPlan, '2026-05-13', readScheduleAdjustments('mikey', swapUndoStorage), week1Start).workout?.id, wednesdayFoundation.id)
+
 assert.equal(classifyWorkoutIntensity(mondayFoundation), 'easy')
 assert.equal(classifyWorkoutIntensity(sundayLongRun), 'long_run')
 assert.equal(classifyWorkoutIntensity(fridayInterval), 'quality')
@@ -181,6 +197,7 @@ assert.equal(classifyWorkoutIntensity(mondayFoundation, crossTrain), 'cross_trai
 const easyMoveResult = evaluateScheduleAdjustment(profile.trainingPlan, moved, [], week1Start)
 assert.equal(easyMoveResult.allowed, true)
 assert.equal(easyMoveResult.severity, 'safe')
+assert.equal(getSwapTargetWorkout(profile.trainingPlan, '2026-05-13', [], week1Start)?.id, wednesdayFoundation.id)
 
 const guardrailPlan = planWithRestDays(profile.trainingPlan, ['w1-d3', 'w1-d6'])
 const intervalNextToFastFinish = adjustment({
@@ -221,12 +238,59 @@ const sameDayMove = adjustment({
   id: 'move-second-workout-same-day',
   workoutId: wednesdayFoundation.id,
   originalDate: '2026-05-13',
-  assignedDate: '2026-08-25',
+  assignedDate: '2026-05-11',
   action: 'moved',
 })
-const sameDayResult = evaluateScheduleAdjustment(profile.trainingPlan, sameDayMove, [moved], week1Start)
+const sameDayResult = evaluateScheduleAdjustment(profile.trainingPlan, sameDayMove, [], week1Start)
 assert.equal(sameDayResult.allowed, false)
-assert.match(sameDayResult.warnings.join(' '), /multiple workouts into the same day/i)
+assert.match(sameDayResult.warnings.join(' '), /swap workouts instead/i)
+
+const safeSwapResult = evaluateScheduleSwap(profile.trainingPlan, swapMonday, swapWednesday, [], week1Start)
+assert.equal(safeSwapResult.allowed, true)
+
+const hardSwapSelected = adjustment({
+  id: 'swap-friday-with-wednesday',
+  workoutId: fridayInterval.id,
+  originalDate: '2026-05-15',
+  assignedDate: '2026-05-13',
+  action: 'swapped',
+  swapWithWorkoutId: wednesdayFoundation.id,
+  swapGroupId: 'swap-hard',
+})
+const hardSwapTarget = adjustment({
+  id: 'swap-wednesday-with-friday',
+  workoutId: wednesdayFoundation.id,
+  originalDate: '2026-05-13',
+  assignedDate: '2026-05-15',
+  action: 'swapped',
+  swapWithWorkoutId: fridayInterval.id,
+  swapGroupId: 'swap-hard',
+})
+const hardSwapResult = evaluateScheduleSwap(guardrailPlan, hardSwapSelected, hardSwapTarget, [], week1Start)
+assert.equal(hardSwapResult.allowed, false)
+assert.match(hardSwapResult.warnings.join(' '), /hard workouts back-to-back/i)
+
+const longRunSwapSelected = adjustment({
+  id: 'swap-long-with-wednesday',
+  workoutId: sundayLongRun.id,
+  originalDate: '2026-05-17',
+  assignedDate: '2026-05-13',
+  action: 'swapped',
+  swapWithWorkoutId: wednesdayFoundation.id,
+  swapGroupId: 'swap-long',
+})
+const longRunSwapTarget = adjustment({
+  id: 'swap-wednesday-with-long',
+  workoutId: wednesdayFoundation.id,
+  originalDate: '2026-05-13',
+  assignedDate: '2026-05-17',
+  action: 'swapped',
+  swapWithWorkoutId: sundayLongRun.id,
+  swapGroupId: 'swap-long',
+})
+const longRunSwapResult = evaluateScheduleSwap(guardrailPlan, longRunSwapSelected, longRunSwapTarget, [], week1Start)
+assert.equal(longRunSwapResult.allowed, false)
+assert.match(longRunSwapResult.warnings.join(' '), /long run too close/i)
 
 const sorenessMove = adjustment({
   id: 'soreness-move',

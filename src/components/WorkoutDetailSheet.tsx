@@ -5,6 +5,9 @@ import type { Zone } from '../data/zones'
 import type { PainFlag, WorkoutStatus } from '../hooks/useProgress'
 import {
   evaluateScheduleAdjustment,
+  evaluateScheduleSwap,
+  getSwapTargetWorkout,
+  resolveAdjustedWorkoutForDate,
   type CrossTrainingType,
   type ResolvedAdjustedWorkout,
   type ScheduleAdjustment,
@@ -66,7 +69,7 @@ export function WorkoutDetailSheet({
   onSaveModification,
   onNote,
   onToggleFlag,
-  onSaveScheduleAdjustment,
+  onSaveScheduleAdjustments,
   onUndoScheduleAdjustment,
 }: {
   workout: Workout | null
@@ -87,7 +90,7 @@ export function WorkoutDetailSheet({
   onSaveModification: (summary: string) => void
   onNote: (note: string) => void
   onToggleFlag: (flag: PainFlag) => void
-  onSaveScheduleAdjustment: (adjustment: ScheduleAdjustment) => void
+  onSaveScheduleAdjustments: (adjustments: ScheduleAdjustment[]) => void
   onUndoScheduleAdjustment: (adjustmentId: string, assignedDate: string, workoutId: string) => void
 }) {
   const [introIndex, setIntroIndex] = useState<number | null>(null)
@@ -157,11 +160,17 @@ export function WorkoutDetailSheet({
     ? 'Skipped'
     : selectedResolvedWorkout?.isCrossTraining
       ? 'Cross-training substitute'
+      : activeAdjustment?.action === 'swapped'
+        ? `Swapped from ${activeAdjustment.originalDate}`
       : activeAdjustment?.action === 'moved'
         ? `Moved from ${activeAdjustment.originalDate}`
         : activeAdjustment
           ? 'Adjusted'
           : 'Original plan'
+  const occupiedTargetWorkout = moveDate
+    ? getSwapTargetWorkout(basePlan, moveDate, scheduleAdjustments, week1Start)
+    : null
+  const swapTargetWorkout = occupiedTargetWorkout && occupiedTargetWorkout.id !== activeWorkout.id ? occupiedTargetWorkout : null
 
   function makeAdjustment(action: ScheduleAdjustment['action'], nextAssignedDate = assignedDate, extra: Partial<ScheduleAdjustment> = {}): ScheduleAdjustment {
     const now = new Date().toISOString()
@@ -184,7 +193,7 @@ export function WorkoutDetailSheet({
 
   function saveSkip() {
     if (!window.confirm('Skip this workout? This will not count as completed.')) return
-    onSaveScheduleAdjustment(makeAdjustment('skipped', assignedDate, { reason: 'User skipped workout' }))
+    onSaveScheduleAdjustments([makeAdjustment('skipped', assignedDate, { reason: 'User skipped workout' })])
   }
 
   function previewMove(nextDate: string) {
@@ -193,27 +202,93 @@ export function WorkoutDetailSheet({
       setMoveResult(null)
       return
     }
-    const candidate = makeAdjustment('moved', nextDate)
-    setMoveResult(evaluateScheduleAdjustment(basePlan, candidate, scheduleAdjustments, week1Start))
+    const moveCandidate = makeAdjustment('moved', nextDate)
+    const targetWorkout = getSwapTargetWorkout(basePlan, nextDate, scheduleAdjustments, week1Start)
+    if (targetWorkout && targetWorkout.id !== activeWorkout.id) {
+      const targetResolved = resolveAdjustedWorkoutForDate(basePlan, nextDate, scheduleAdjustments, week1Start)
+      const swapGroupId = createAdjustmentId('swap-group', activeWorkout.id)
+      const selectedSwap = makeAdjustment('swapped', nextDate, {
+        swapGroupId,
+        swapWithWorkoutId: targetWorkout.id,
+        reason: 'User swapped workouts',
+      })
+      const targetSwap: ScheduleAdjustment = {
+        id: createAdjustmentId('swapped', targetWorkout.id),
+        planId,
+        profileId,
+        workoutId: targetWorkout.id,
+        originalDate: targetResolved.originalDate ?? nextDate,
+        assignedDate,
+        action: 'swapped',
+        status: 'active',
+        createdAt: selectedSwap.createdAt,
+        updatedAt: selectedSwap.updatedAt,
+        source: 'user',
+        guardrailWarnings: [],
+        swapWithWorkoutId: activeWorkout.id,
+        swapGroupId,
+        reason: 'User swapped workouts',
+      }
+      setMoveResult(evaluateScheduleSwap(basePlan, selectedSwap, targetSwap, scheduleAdjustments, week1Start))
+      return
+    }
+    setMoveResult(evaluateScheduleAdjustment(basePlan, moveCandidate, scheduleAdjustments, week1Start))
   }
 
   function saveMove() {
     if (!moveDate || !moveResult) return
     if (!moveResult.allowed) return
+    if (swapTargetWorkout) {
+      const targetResolved = resolveAdjustedWorkoutForDate(basePlan, moveDate, scheduleAdjustments, week1Start)
+      const now = new Date().toISOString()
+      const swapGroupId = createAdjustmentId('swap-group', activeWorkout.id)
+      const selectedSwap = makeAdjustment('swapped', moveDate, {
+        createdAt: now,
+        updatedAt: now,
+        guardrailWarnings: moveResult.warnings,
+        reason: 'User swapped workouts',
+        swapGroupId,
+        swapWithWorkoutId: swapTargetWorkout.id,
+      })
+      const targetSwap: ScheduleAdjustment = {
+        id: createAdjustmentId('swapped', swapTargetWorkout.id),
+        planId,
+        profileId,
+        workoutId: swapTargetWorkout.id,
+        originalDate: targetResolved.originalDate ?? moveDate,
+        assignedDate,
+        action: 'swapped',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+        source: 'user',
+        guardrailWarnings: moveResult.warnings,
+        reason: 'User swapped workouts',
+        swapWithWorkoutId: activeWorkout.id,
+        swapGroupId,
+      }
+      const message = moveResult.severity === 'caution'
+        ? `${moveResult.warnings.join('\n')}\n\nSwap anyway?`
+        : `Swap this workout with ${swapTargetWorkout.name} on ${moveDate}?`
+      if (!window.confirm(message)) return
+      onSaveScheduleAdjustments([selectedSwap, targetSwap])
+      setIsMoveOpen(false)
+      return
+    }
     const message = moveResult.severity === 'caution'
       ? `${moveResult.warnings.join('\n')}\n\nMove anyway?`
       : `Move this workout to ${moveDate}?`
     if (!window.confirm(message)) return
-    onSaveScheduleAdjustment(makeAdjustment('moved', moveDate, { guardrailWarnings: moveResult.warnings }))
+    onSaveScheduleAdjustments([makeAdjustment('moved', moveDate, { guardrailWarnings: moveResult.warnings })])
     setIsMoveOpen(false)
   }
 
   function saveCrossTraining() {
     if (!window.confirm('Replace this run with a cross-training substitute? Completion still stays manual.')) return
-    onSaveScheduleAdjustment(makeAdjustment('cross_train', assignedDate, {
+    onSaveScheduleAdjustments([makeAdjustment('cross_train', assignedDate, {
       crossTrainingType,
       reason: 'User selected cross-training substitute',
-    }))
+    })])
   }
 
   function undoAdjustment() {
@@ -242,7 +317,7 @@ export function WorkoutDetailSheet({
         <p className="eyebrow">Week {workout.week} · {workout.dayName}</p>
         <h2 id="detail-title">{workout.name}</h2>
         <div className="schedule-summary-row" aria-label="Schedule assignment">
-          <span className={`schedule-pill ${selectedResolvedWorkout?.isSkipped ? 'skipped' : selectedResolvedWorkout?.isCrossTraining ? 'cross-train' : activeAdjustment ? 'moved' : 'safe'}`}>
+          <span className={`schedule-pill ${selectedResolvedWorkout?.isSkipped ? 'skipped' : selectedResolvedWorkout?.isCrossTraining ? 'cross-train' : activeAdjustment?.action === 'swapped' ? 'swapped' : activeAdjustment ? 'moved' : 'safe'}`}>
             {scheduleLabel}
           </span>
           <span>{assignedDate}</span>
@@ -317,7 +392,14 @@ export function WorkoutDetailSheet({
                   <strong>{guardrailLabel(moveResult)}:</strong> {moveResult.warnings[0] ?? moveResult.recommendation}
                 </p>
               ) : null}
-              <button className="primary-button" type="button" disabled={!moveResult?.allowed} onClick={saveMove}>Save move</button>
+              {swapTargetWorkout ? (
+                <p className="schedule-occupied-note">
+                  <strong>Occupied by:</strong> {swapTargetWorkout.name}. Swap instead?
+                </p>
+              ) : null}
+              <button className="primary-button" type="button" disabled={!moveResult?.allowed || moveDate === assignedDate} onClick={saveMove}>
+                {swapTargetWorkout ? 'Swap workouts' : 'Save move'}
+              </button>
             </div>
           ) : null}
         </section>

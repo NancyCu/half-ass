@@ -36,6 +36,7 @@ export type ScheduleAdjustment = {
   crossTrainingType?: CrossTrainingType
   replacedWorkoutId?: string
   swapWithWorkoutId?: string
+  swapGroupId?: string
 }
 
 export type ScheduleAdjustmentState = {
@@ -139,6 +140,7 @@ function sanitizeAdjustment(value: unknown, planId: string): ScheduleAdjustment 
     crossTrainingType: sanitizeCrossTrainingType(candidate.crossTrainingType),
     replacedWorkoutId: typeof candidate.replacedWorkoutId === 'string' ? candidate.replacedWorkoutId : undefined,
     swapWithWorkoutId: typeof candidate.swapWithWorkoutId === 'string' ? candidate.swapWithWorkoutId : undefined,
+    swapGroupId: typeof candidate.swapGroupId === 'string' ? candidate.swapGroupId : undefined,
   }
 }
 
@@ -266,6 +268,15 @@ export function addScheduleAdjustment(
   return writeScheduleAdjustments(planId, [...current.adjustments, adjustment], storage)
 }
 
+export function addScheduleAdjustments(
+  planId: string,
+  adjustments: ScheduleAdjustment[],
+  storage: ScheduleAdjustmentStorage | null = getDefaultStorage(),
+): ScheduleAdjustmentState {
+  const current = readScheduleAdjustments(planId, storage)
+  return writeScheduleAdjustments(planId, [...current.adjustments, ...adjustments], storage)
+}
+
 export function undoScheduleAdjustment(
   planId: string,
   adjustmentId: string,
@@ -273,10 +284,12 @@ export function undoScheduleAdjustment(
 ): ScheduleAdjustmentState {
   const current = readScheduleAdjustments(planId, storage)
   const now = new Date().toISOString()
+  const selected = current.adjustments.find((adjustment) => adjustment.id === adjustmentId)
+  const swapGroupId = selected?.swapGroupId
   return writeScheduleAdjustments(
     planId,
     current.adjustments.map((adjustment) => (
-      adjustment.id === adjustmentId
+      adjustment.id === adjustmentId || (swapGroupId && adjustment.swapGroupId === swapGroupId)
         ? { ...adjustment, status: 'undone' as const, updatedAt: now }
         : adjustment
     )),
@@ -384,86 +397,138 @@ export function getAdjustedWeekSchedule(
   ))
 }
 
+function unique<T>(values: T[]): T[] {
+  return [...new Set(values)]
+}
+
+function findAssignedWorkoutIdForDate(
+  plan: WeekPlan[],
+  targetDate: string,
+  adjustments: ScheduleAdjustment[],
+  week1StartISO: string,
+): string | null {
+  const workout = resolveAdjustedWorkoutForDate(plan, targetDate, adjustments, week1StartISO).workout
+  return workout && workout.type !== 'rest' ? workout.id : null
+}
+
+function countAssignmentsByDate(adjustments: ScheduleAdjustment[]): Map<string, number> {
+  const counts = new Map<string, number>()
+  adjustments.forEach((adjustment) => {
+    if (adjustment.action === 'skipped' || adjustment.action === 'missed') return
+    counts.set(adjustment.assignedDate, (counts.get(adjustment.assignedDate) ?? 0) + 1)
+  })
+  return counts
+}
+
+function evaluateScheduleAdjustmentsBatch(
+  plan: WeekPlan[],
+  candidateAdjustments: ScheduleAdjustment[],
+  existingAdjustments: ScheduleAdjustment[] | ScheduleAdjustmentState = [],
+  week1StartISO = '2026-05-11',
+): ScheduleGuardrailResult {
+  const warnings: string[] = []
+  const active = getActiveScheduleAdjustments(existingAdjustments).filter((entry) => !candidateAdjustments.some((candidate) => candidate.id === entry.id))
+  const nextAdjustments = [...active, ...candidateAdjustments]
+  const assignmentCounts = countAssignmentsByDate(nextAdjustments)
+  const duplicateDate = [...assignmentCounts.entries()].find(([, count]) => count > 1)?.[0]
+  if (duplicateDate) {
+    return result(false, ['Do not cram multiple workouts into the same day.'], 'Swap workouts or choose an open day instead of doubling up.')
+  }
+
+  const affectedDates = unique(candidateAdjustments.flatMap((adjustment) => [adjustment.originalDate, adjustment.assignedDate]))
+  const affectedWeeks = unique(affectedDates.map((date) => {
+    const parsed = parseISODate(date)
+    return toISODate(addDays(parsed, -((parsed.getDay() + 6) % 7)))
+  }))
+
+  for (const weekStart of affectedWeeks) {
+    const weekSchedule = getAdjustedWeekSchedule(plan, weekStart, 7, nextAdjustments, week1StartISO)
+    const qualityCount = weekSchedule.filter((entry) => classifyWorkoutIntensity(entry.workout, entry.adjustment) === 'quality').length
+    if (qualityCount > 3) {
+      warnings.push('This week has more hard workouts than the guardrail recommends.')
+      break
+    }
+  }
+
+  const datesToInspect = unique(candidateAdjustments.map((adjustment) => adjustment.assignedDate))
+  for (const assignedDate of datesToInspect) {
+    const resolved = resolveAdjustedWorkoutForDate(plan, assignedDate, nextAdjustments, week1StartISO)
+    const workout = resolved.workout
+    if (!workout || resolved.isSkipped) continue
+    const intensity = classifyWorkoutIntensity(workout, resolved.adjustment)
+    const parsedDate = parseISODate(assignedDate)
+    const previous = resolveAdjustedWorkoutForDate(plan, toISODate(addDays(parsedDate, -1)), nextAdjustments, week1StartISO)
+    const next = resolveAdjustedWorkoutForDate(plan, toISODate(addDays(parsedDate, 1)), nextAdjustments, week1StartISO)
+    const previousIntensity = classifyWorkoutIntensity(previous.workout, previous.adjustment)
+    const nextIntensity = classifyWorkoutIntensity(next.workout, next.adjustment)
+
+    if (intensity === 'quality' && (previousIntensity === 'quality' || nextIntensity === 'quality')) {
+      return result(false, ['This swap would put two hard workouts back-to-back.'], 'Keep at least one easy, rest, or cross-training day between quality workouts.')
+    }
+
+    if (intensity === 'long_run' && (previousIntensity === 'quality' || nextIntensity === 'quality')) {
+      return result(false, ['This places a long run too close to a quality workout.'], 'Keep at least one easier day between long-run and quality stress.')
+    }
+  }
+
+  const sorenessAdjustment = candidateAdjustments.find((adjustment) => sorenessDescriptors.test(adjustment.reason ?? ''))
+  if (sorenessAdjustment && sorenessAdjustment.action !== 'cross_train' && sorenessAdjustment.action !== 'skipped') {
+    warnings.push('Cross-training or rest is recommended when soreness or minor injury is the reason.')
+    return result(true, warnings, 'Prefer cross-training or rest instead of forcing a catch-up run.')
+  }
+
+  if (candidateAdjustments.every((adjustment) => adjustment.action === 'cross_train')) {
+    return result(true, warnings, 'Preserve the same time, structure, and zones with non-impact aerobic work.')
+  }
+
+  const hasSwap = candidateAdjustments.some((adjustment) => adjustment.action === 'swapped')
+  const recommendation = warnings.length > 0
+    ? 'Proceed with caution and keep the rest of the week easy.'
+    : hasSwap
+      ? 'Swap keeps the current schedule guardrails intact.'
+      : 'Adjustment passes the current schedule guardrails.'
+  return result(true, warnings, recommendation)
+}
+
+export function getSwapTargetWorkout(
+  plan: WeekPlan[],
+  targetDate: string,
+  adjustments: ScheduleAdjustment[] | ScheduleAdjustmentState = [],
+  week1StartISO = '2026-05-11',
+): Workout | null {
+  const resolved = resolveAdjustedWorkoutForDate(plan, targetDate, adjustments, week1StartISO)
+  return resolved.workout?.type === 'rest' ? null : resolved.workout
+}
+
+export function evaluateScheduleSwap(
+  plan: WeekPlan[],
+  first: ScheduleAdjustment,
+  second: ScheduleAdjustment,
+  existingAdjustments: ScheduleAdjustment[] | ScheduleAdjustmentState = [],
+  week1StartISO = '2026-05-11',
+): ScheduleGuardrailResult {
+  return evaluateScheduleAdjustmentsBatch(plan, [first, second], existingAdjustments, week1StartISO)
+}
+
 export function evaluateScheduleAdjustment(
   plan: WeekPlan[],
   adjustment: ScheduleAdjustment,
   existingAdjustments: ScheduleAdjustment[] | ScheduleAdjustmentState = [],
   week1StartISO = '2026-05-11',
 ): ScheduleGuardrailResult {
-  const warnings: string[] = []
-  const active = getActiveScheduleAdjustments(existingAdjustments).filter((entry) => entry.id !== adjustment.id)
   const workout = getWorkoutById(plan, adjustment.workoutId)
   if (!workout) return result(false, ['Workout could not be found in the base plan.'], 'Block this adjustment until the plan reference is fixed.')
-
-  const sameDayAssignments = active.filter((entry) => entry.status === 'active' && sameDate(entry.assignedDate, adjustment.assignedDate))
-  if (sameDayAssignments.length > 0 && adjustment.action !== 'swapped') {
-    return result(false, ['Do not cram multiple workouts into the same day.'], 'Skip or replace one workout instead of doubling up.')
+  const active = getActiveScheduleAdjustments(existingAdjustments).filter((entry) => entry.id !== adjustment.id)
+  const currentAssignedWorkoutId = findAssignedWorkoutIdForDate(plan, adjustment.assignedDate, active, week1StartISO)
+  if (
+    adjustment.action === 'moved'
+    && currentAssignedWorkoutId
+    && currentAssignedWorkoutId !== workout.id
+  ) {
+    return result(false, ['Target date is already occupied. Swap workouts instead of cramming two onto one day.'], 'Use the swap flow or choose an open day.')
   }
 
-  const nextAdjustments = [...active, adjustment]
-  const weekStart = addDays(parseISODate(adjustment.assignedDate), -((parseISODate(adjustment.assignedDate).getDay() + 6) % 7))
-  const weekSchedule = getAdjustedWeekSchedule(plan, weekStart, 7, nextAdjustments, week1StartISO)
-  const assignedIndex = weekSchedule.findIndex((entry) => sameDate(entry.assignedDate, adjustment.assignedDate))
-  const intensity = classifyWorkoutIntensity(workout, adjustment)
-  const previous = assignedIndex > 0 ? weekSchedule[assignedIndex - 1] : null
-  const next = assignedIndex >= 0 && assignedIndex < weekSchedule.length - 1 ? weekSchedule[assignedIndex + 1] : null
-  const previousIntensity = previous ? classifyWorkoutIntensity(previous.workout, previous.adjustment) : 'rest'
-  const nextIntensity = next ? classifyWorkoutIntensity(next.workout, next.adjustment) : 'rest'
-
-  if (intensity === 'quality' && (previousIntensity === 'quality' || nextIntensity === 'quality')) {
-    return result(false, ['This move creates hard workouts back-to-back.'], 'Skip this workout or move it away from another quality day.')
-  }
-
-  if (intensity === 'long_run' && (previousIntensity === 'quality' || nextIntensity === 'quality')) {
-    return result(false, ['This puts a long run too close to a quality session.'], 'Keep at least one easy, rest, or cross-training day between long and quality stress.')
-  }
-
-  if (intensity === 'quality') {
-    const qualityCount = weekSchedule.filter((entry) => classifyWorkoutIntensity(entry.workout, entry.adjustment) === 'quality').length
-    if (qualityCount > 3) {
-      warnings.push('This week has more hard workouts than the guardrail recommends.')
-    }
-  }
-
-  const baseDate = getBaseDateByWorkoutId(plan, week1StartISO).get(workout.id)
-  if (baseDate && !sameDate(baseDate, adjustment.assignedDate)) {
-    const assignmentsOnTarget = [
-      ...active.filter((entry) => sameDate(entry.assignedDate, adjustment.assignedDate)),
-      ...allPlanWorkouts(plan)
-        .filter((entry) => (
-          toISODate(workoutDate(entry, week1StartISO)) === adjustment.assignedDate
-          && entry.id !== workout.id
-          && entry.type !== 'rest'
-        ))
-        .map((entry) => ({
-          id: `base-${entry.id}`,
-          planId: adjustment.planId,
-          workoutId: entry.id,
-          originalDate: adjustment.assignedDate,
-          assignedDate: adjustment.assignedDate,
-          action: 'moved' as const,
-          status: 'active' as const,
-          createdAt: adjustment.createdAt,
-          updatedAt: adjustment.updatedAt,
-          source: 'system' as const,
-          guardrailWarnings: [],
-        })),
-    ]
-    if (assignmentsOnTarget.length > 0 && adjustment.action !== 'swapped') {
-      return result(false, ['Do not cram multiple workouts into the same day.'], 'Choose an open day or skip instead of doubling up.')
-    }
-  }
-
-  if (sorenessDescriptors.test(adjustment.reason ?? '') && adjustment.action !== 'cross_train' && adjustment.action !== 'skipped') {
-    warnings.push('Cross-training or rest is recommended when soreness or minor injury is the reason.')
-    return result(true, warnings, 'Prefer cross-training or rest instead of forcing a catch-up run.')
-  }
-
-  if (adjustment.action === 'cross_train') {
-    return result(true, warnings, 'Preserve the same time, structure, and zones with non-impact aerobic work.')
-  }
-
-  return result(true, warnings, warnings.length ? 'Proceed with caution and keep the rest of the week easy.' : 'Adjustment passes the current schedule guardrails.')
+  return evaluateScheduleAdjustmentsBatch(plan, [adjustment], active, week1StartISO)
 }
 
 export function getMissedWorkoutRecommendation(missedDays: number, reason?: string): MissedWorkoutRecommendation {

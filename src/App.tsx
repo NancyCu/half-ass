@@ -6,6 +6,7 @@ import { getTrainingPlanProfile, trainingPlanProfiles, type PlanId, type Workout
 import { mannyZoneTargets, mannyZones, zoneTargets, zones } from './data/zones'
 import { useProgress } from './hooks/useProgress'
 import {
+  addScheduleAdjustments,
   addScheduleAdjustment,
   readScheduleAdjustments,
   resolveAdjustedWorkoutForDate,
@@ -156,12 +157,18 @@ function App() {
     setSelectedWorkoutEntry({ workout, assignedDate })
   }
 
-  function saveScheduleAdjustment(adjustment: ScheduleAdjustment) {
-    addScheduleAdjustment(activeProfile.id, adjustment)
+  function saveScheduleAdjustments(adjustments: ScheduleAdjustment[]) {
+    if (adjustments.length === 0) return
+    if (adjustments.length === 1) {
+      addScheduleAdjustment(activeProfile.id, adjustments[0])
+    } else {
+      addScheduleAdjustments(activeProfile.id, adjustments)
+    }
     setScheduleAdjustmentVersion((version) => version + 1)
-    const adjustedWorkout = activeProfile.allWorkouts.find((workout) => workout.id === adjustment.workoutId)
+    const focusedAdjustment = adjustments[0]
+    const adjustedWorkout = activeProfile.allWorkouts.find((workout) => workout.id === focusedAdjustment.workoutId)
     if (adjustedWorkout) {
-      setSelectedWorkoutEntry({ workout: adjustedWorkout, assignedDate: adjustment.assignedDate })
+      setSelectedWorkoutEntry({ workout: adjustedWorkout, assignedDate: focusedAdjustment.assignedDate })
     }
   }
 
@@ -272,7 +279,7 @@ function App() {
         onSaveModification={(summary) => selectedWorkout && progressApi.saveModification(selectedWorkout.id, summary)}
         onNote={(note) => selectedWorkout && progressApi.setNote(selectedWorkout.id, note)}
         onToggleFlag={(flag) => selectedWorkout && progressApi.toggleFlag(selectedWorkout.id, flag)}
-        onSaveScheduleAdjustment={saveScheduleAdjustment}
+        onSaveScheduleAdjustments={saveScheduleAdjustments}
         onUndoScheduleAdjustment={undoSelectedScheduleAdjustment}
       />
     </div>
