@@ -34,8 +34,8 @@ The adapter maps the existing `WeekPlan[]`, optional settings, and optional prog
             type: "foundation",
             duration: "30 min",
             zone: "Z1/Z2",
-            targetBpm: "130-143 bpm",
-            targetPace: "10:45-11:30/mi",
+            targetBpm: "129-140 bpm",
+            targetPace: "10:15-11:20/mi",
             steps: ["5 mins Zone 1", "20 mins Zone 2", "5 mins Zone 1"]
           }
         ]
@@ -59,6 +59,21 @@ The adapter maps the existing `WeekPlan[]`, optional settings, and optional prog
 ```
 
 This is preview/import-only for a later StrideSync flow. It does not connect to Firebase, does not write to Firestore, does not add a StrideSync dependency, and does not change localStorage migration behavior.
+
+## Phase 12B: Beta-Blocker Adjusted Training Zones
+
+Phase 12B updates Mikey's static 80/20 training-zone configuration to the current beta-blocker adjusted references:
+
+- Threshold HR: about 150 bpm
+- Threshold pace: about 8:40/mi
+- Zone 1 Recovery: 118-128 bpm, 11:20+/mi
+- Zone 2 Aerobic Endurance: 129-140 bpm, 10:15-11:20/mi
+- Black Hole Zone Moderate Gray Zone: 141-145 bpm, 9:30-10:15/mi
+- Zone 3 Tempo / Fast Finish: 146-152 bpm, 8:40-9:20/mi
+- Zone 4 Hard Intervals: 153-158 bpm, 7:50-8:30/mi
+- Zone 5 Speed / Short Bursts: 159+ bpm if reachable, faster than 7:45/mi
+
+This is a local static data/config update. It does not add Firebase or Firestore reads/writes, does not change StrideSync handoff auto-accept behavior, and does not change localStorage migration behavior.
 
 ## Developer Smoke-Test Export
 

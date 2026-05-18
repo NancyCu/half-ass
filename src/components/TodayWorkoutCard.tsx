@@ -13,6 +13,11 @@ const flagLabels: Record<PainFlag, string> = {
   'HR too high': 'HR High',
 }
 
+function easyDayHrCap(targetBpm: string) {
+  const match = targetBpm.match(/(\d+)\s*[-–]\s*(\d+)/)
+  return match ? Number(match[2]) : null
+}
+
 export function TodayWorkoutCard({
   workout,
   week1Start,
@@ -45,6 +50,7 @@ export function TodayWorkoutCard({
   const isEasyDay = ['foundation', 'recovery', 'long-run', 'long-speed-play', 'long-fast-finish'].includes(workout.type)
   const library = getWorkoutLibraryEntry(workout.type)
   const distanceOrDuration = workout.miles ? `${workout.miles} mi` : workout.duration
+  const easyHrCap = easyDayHrCap(workout.targetBpm)
 
   return (
     <section className={`today-card ${library.color} ${isEasyDay ? 'easy-day' : ''}`}>
@@ -57,7 +63,7 @@ export function TodayWorkoutCard({
         <div><span>Zones</span><strong><ZoneChips zones={workout.zone} /></strong></div>
       </div>
       <p className="workout-goal-strip">{library.what}</p>
-      {isEasyDay ? <div className="warning-banner">Stay under 143 bpm</div> : null}
+      {isEasyDay && easyHrCap ? <div className="warning-banner">Stay under {easyHrCap} bpm</div> : null}
       <ol className="step-list">
         {workout.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}
       </ol>

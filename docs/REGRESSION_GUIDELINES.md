@@ -5,6 +5,7 @@
 - Dashboard must answer the today-workout question within the first viewport on phone-sized screens.
 - Planned workout names and numbering must come from `src/data/trainingPlan.ts`, not display-only suffixes.
 - Easy foundation, recovery, and long-run days must preserve easy-effort/HR-warning behavior.
+- Mikey's beta-blocker adjusted 80/20 zones must stay on the 150 bpm threshold / 8:40 per mile threshold pace model: Z1 118-128, Z2 129-140, Black Hole 141-145, Z3 146-152, Z4 153-158, Z5 159+ if reachable.
 - Calendar/plan views must stay readable and card-based on mobile.
 - Workout detail sheet must keep status, notes, flags, target HR, target pace, zones, segments, and Garmin helpers.
 - Progress must use `localStorage`; do not replace it with fake state.

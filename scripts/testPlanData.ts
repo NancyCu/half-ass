@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { getTrainingPlanProfile, type Workout } from '../src/data/trainingPlan'
+import { lactateThresholdHr, thresholdPace, zoneTargets, zones } from '../src/data/zones'
 import { getPrePlanWorkoutForDate } from '../src/utils/workouts'
 
 const expectedFoundationRun5Steps = ['5 mins Zone 1', '50 mins Zone 2', '5 mins Zone 1']
@@ -26,8 +27,20 @@ const mikey = getTrainingPlanProfile('mikey')
 const week1 = mikey.trainingPlan[0]
 const mondayFoundation = week1.days[0]
 
+assert.equal(lactateThresholdHr, 150)
+assert.equal(thresholdPace, '8:40/mi')
+assert.equal(mikey.lactateThresholdHr, 150)
+assert.equal(mikey.thresholdPace, '8:40/mi')
+assert.equal(zoneTargets.Z1.bpm, '118-128 bpm')
+assert.equal(zoneTargets.Z2.bpm, '129-140 bpm')
+assert.equal(zoneTargets.Z3.bpm, '146-152 bpm')
+assert.equal(zoneTargets.Z4.bpm, '153-158 bpm')
+assert.equal(zoneTargets.Z5.bpm, '159+ bpm if reachable')
+assert.equal(zones.find((zone) => zone.id === 'black-hole')?.bpm, '141-145 bpm')
 assert.equal(mondayFoundation.name, 'Foundation Run 5')
 assert.equal(mondayFoundation.duration, '60 min')
+assert.equal(mondayFoundation.targetBpm, '129-140 bpm')
+assert.equal(mondayFoundation.targetPace, '10:15-11:20/mi')
 assert.deepEqual(mondayFoundation.steps, expectedFoundationRun5Steps)
 assert.equal(planLoad(week1.days), 37.8)
 
