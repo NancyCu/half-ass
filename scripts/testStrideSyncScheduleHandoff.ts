@@ -2,8 +2,28 @@ import assert from 'node:assert/strict'
 import {
   buildScheduleHandoffId,
   buildStrideSyncScheduleHandoffUrl,
+  clearScheduleHandoffHistory,
+  getScheduleHandoffHistoryStorageKey,
+  readScheduleHandoffHistory,
+  recordScheduleHandoffHistory,
   STRIDESYNC_SCHEDULE_ADJUSTMENT_VERSION,
 } from '../src/lib/strideSyncScheduleHandoff'
+import { getScheduleAdjustmentStorageKey } from '../src/lib/scheduleAdjustments'
+
+type MemoryStorage = {
+  getItem(key: string): string | null
+  setItem(key: string, value: string): void
+  removeItem(key: string): void
+}
+
+function createMemoryStorage(): MemoryStorage {
+  const values = new Map<string, string>()
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  }
+}
 
 const basePayload = {
   actionType: 'moved' as const,
@@ -18,6 +38,10 @@ const basePayload = {
   workoutId: 'w1-d1',
   workoutName: 'Foundation Run 5',
 }
+
+assert.equal(getScheduleHandoffHistoryStorageKey('mikey'), 'half_ass_schedule_handoff_history_v1:mikey')
+assert.equal(getScheduleHandoffHistoryStorageKey('manny'), 'half_ass_schedule_handoff_history_v1:manny')
+assert.notEqual(getScheduleHandoffHistoryStorageKey('mikey'), getScheduleAdjustmentStorageKey('mikey'))
 
 {
   const { scheduleHandoffId, url } = buildStrideSyncScheduleHandoffUrl(basePayload, {
@@ -129,6 +153,78 @@ const basePayload = {
   assert.equal(parsed.searchParams.get('guardrailSeverity'), 'caution')
   assert.match(parsed.searchParams.get('guardrailWarnings') ?? '', /hard\/easy rhythm/)
   assert.ok(url.length < 700, `Expected normal handoff URL to stay reasonably short, got ${url.length}`)
+}
+
+{
+  const storage = createMemoryStorage()
+  const { url, scheduleHandoffId } = buildStrideSyncScheduleHandoffUrl(basePayload, {
+    baseUrl: 'https://mikerun.web.app/?trainingTab=1',
+  })
+  const recorded = recordScheduleHandoffHistory(basePayload, {
+    status: 'opened',
+    occurredAt: '2026-05-18T12:10:00.000Z',
+    url,
+  }, storage)
+  const history = readScheduleHandoffHistory('mikey', storage)
+
+  assert.equal(recorded.scheduleHandoffId, scheduleHandoffId)
+  assert.equal(history.entries.length, 1)
+  assert.equal(history.entries[0]?.status, 'opened')
+  assert.equal(history.entries[0]?.attemptCount, 1)
+  assert.equal(history.entries[0]?.planId, 'mikey')
+  assert.equal(history.entries[0]?.summary, 'Move Foundation Run 5 · May 11 -> May 14')
+}
+
+{
+  const storage = createMemoryStorage()
+  recordScheduleHandoffHistory(basePayload, {
+    status: 'opened',
+    occurredAt: '2026-05-18T12:10:00.000Z',
+  }, storage)
+  recordScheduleHandoffHistory(basePayload, {
+    status: 'opened',
+    occurredAt: '2026-05-18T12:12:00.000Z',
+  }, storage)
+  const history = readScheduleHandoffHistory('mikey', storage)
+
+  assert.equal(history.entries.length, 1)
+  assert.equal(history.entries[0]?.scheduleHandoffId, buildScheduleHandoffId(basePayload))
+  assert.equal(history.entries[0]?.attemptCount, 2)
+  assert.equal(history.entries[0]?.updatedAt, '2026-05-18T12:12:00.000Z')
+}
+
+{
+  const storage = createMemoryStorage()
+  storage.setItem(getScheduleAdjustmentStorageKey('mikey'), JSON.stringify({
+    schemaVersion: 1,
+    planId: 'mikey',
+    updatedAt: '2026-05-18T12:00:00.000Z',
+    adjustments: [{ id: 'keep-me' }],
+  }))
+  recordScheduleHandoffHistory(basePayload, {
+    status: 'opened',
+    occurredAt: '2026-05-18T12:10:00.000Z',
+  }, storage)
+
+  assert.match(storage.getItem(getScheduleAdjustmentStorageKey('mikey')) ?? '', /keep-me/)
+}
+
+{
+  const storage = createMemoryStorage()
+  storage.setItem(getScheduleAdjustmentStorageKey('mikey'), JSON.stringify({
+    schemaVersion: 1,
+    planId: 'mikey',
+    updatedAt: '2026-05-18T12:00:00.000Z',
+    adjustments: [{ id: 'adjustment-still-there' }],
+  }))
+  recordScheduleHandoffHistory(basePayload, {
+    status: 'opened',
+    occurredAt: '2026-05-18T12:10:00.000Z',
+  }, storage)
+  clearScheduleHandoffHistory('mikey', storage)
+
+  assert.equal(readScheduleHandoffHistory('mikey', storage).entries.length, 0)
+  assert.match(storage.getItem(getScheduleAdjustmentStorageKey('mikey')) ?? '', /adjustment-still-there/)
 }
 
 console.log('StrideSync schedule handoff tests passed.')

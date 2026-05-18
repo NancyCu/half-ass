@@ -26,6 +26,11 @@ import {
   type StrideSyncHandoff,
   validateStrideSyncAutoAccept,
 } from './lib/strideSyncHandoff'
+import {
+  clearScheduleHandoffHistory,
+  readScheduleHandoffHistory,
+  recordScheduleHandoffHistory,
+} from './lib/strideSyncScheduleHandoff'
 import { useSettings } from './hooks/useSettings'
 import { Calendar } from './pages/Calendar'
 import { Dashboard } from './pages/Dashboard'
@@ -39,6 +44,7 @@ function App() {
   const [selectedWorkoutEntry, setSelectedWorkoutEntry] = useState<SelectedWorkoutEntry | null>(null)
   const [handoffNotice, setHandoffNotice] = useState<HandoffNotice | null>(null)
   const [, setHandoffHistoryVersion] = useState(0)
+  const [, setScheduleHandoffHistoryVersion] = useState(0)
   const [, setScheduleAdjustmentVersion] = useState(0)
   const { settings, updateSettings, resetSettings } = useSettings()
   const activeProfile = getTrainingPlanProfile(settings.planId)
@@ -60,6 +66,9 @@ function App() {
   const handoffHistory = typeof window === 'undefined'
     ? []
     : readStrideSyncHandoffHistory(window.localStorage).entries
+  const scheduleHandoffHistory = typeof window === 'undefined'
+    ? []
+    : readScheduleHandoffHistory(activeProfile.id, window.localStorage).entries
 
   function recordHandoffHistory(
     nextHandoff: StrideSyncHandoff,
@@ -203,6 +212,19 @@ function App() {
     setHandoffHistoryVersion((version) => version + 1)
   }
 
+  function markScheduleHandoffOpened(payload: Parameters<typeof recordScheduleHandoffHistory>[0], url: string) {
+    if (typeof window === 'undefined') return
+    recordScheduleHandoffHistory(payload, { status: 'opened', url }, window.localStorage)
+    setScheduleHandoffHistoryVersion((version) => version + 1)
+  }
+
+  function clearScheduleHandoffReceipts() {
+    if (typeof window === 'undefined') return
+    if (!window.confirm('Clear schedule handoff history? Schedule adjustments and workout progress will not be changed.')) return
+    clearScheduleHandoffHistory(activeProfile.id, window.localStorage)
+    setScheduleHandoffHistoryVersion((version) => version + 1)
+  }
+
   return (
     <div className="app-shell">
       <button className="settings-fab" type="button" onClick={() => setScreen('settings')} aria-label="Open settings">
@@ -255,7 +277,9 @@ function App() {
           progressApi={progressApi}
           activeProfile={activeProfile}
           automationHistory={handoffHistory}
+          scheduleHandoffHistory={scheduleHandoffHistory}
           onClearAutomationHistory={clearAutomationHistory}
+          onClearScheduleHandoffHistory={clearScheduleHandoffReceipts}
           onPlanChange={switchPlan}
         />
       ) : null}
@@ -274,6 +298,7 @@ function App() {
         basePlan={activeProfile.trainingPlan}
         planId={activeProfile.id}
         profileId={activeProfile.id}
+        scheduleHandoffHistory={scheduleHandoffHistory}
         onClose={() => setSelectedWorkoutEntry(null)}
         onStatus={(status) => selectedWorkout && progressApi.setStatus(selectedWorkout.id, status)}
         onSaveModification={(summary) => selectedWorkout && progressApi.saveModification(selectedWorkout.id, summary)}
@@ -281,6 +306,7 @@ function App() {
         onToggleFlag={(flag) => selectedWorkout && progressApi.toggleFlag(selectedWorkout.id, flag)}
         onSaveScheduleAdjustments={saveScheduleAdjustments}
         onUndoScheduleAdjustment={undoSelectedScheduleAdjustment}
+        onScheduleHandoffOpened={markScheduleHandoffOpened}
       />
     </div>
   )

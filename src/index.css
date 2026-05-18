@@ -1500,6 +1500,24 @@ select:focus {
   background: rgba(84, 193, 255, 0.08);
 }
 
+.schedule-handoff-status {
+  display: grid;
+  gap: 3px;
+}
+
+.schedule-handoff-status strong {
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.schedule-handoff-status em,
+.schedule-handoff-status span {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
 .schedule-handoff-button {
   width: fit-content;
   min-height: 38px;
@@ -2096,6 +2114,14 @@ select:focus {
 
 .automation-status-pill.dismissed,
 .automation-status-pill.undone {
+  background: var(--gray);
+}
+
+.automation-status-pill.copied {
+  background: var(--gold);
+}
+
+.automation-status-pill.superseded {
   background: var(--gray);
 }
 

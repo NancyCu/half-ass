@@ -16,7 +16,12 @@ import {
   type ScheduleAdjustmentState,
   type ScheduleGuardrailResult,
 } from '../lib/scheduleAdjustments'
-import { buildStrideSyncScheduleHandoffUrl } from '../lib/strideSyncScheduleHandoff'
+import {
+  buildScheduleHandoffSummary,
+  buildStrideSyncScheduleHandoffUrl,
+  type ScheduleHandoffHistoryEntry,
+  type StrideSyncScheduleHandoffPayload,
+} from '../lib/strideSyncScheduleHandoff'
 import { toISODate } from '../utils/dates'
 import { getWorkoutSegments, workoutISO } from '../utils/workouts'
 import { GarminCopyButton } from './GarminCopyButton'
@@ -63,6 +68,60 @@ function guardrailLabel(result: { severity: ScheduleGuardrailResult['severity'] 
   return 'Safe'
 }
 
+function sameLocalDay(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate()
+}
+
+function formatScheduleHandoffTimestamp(prefix: string, value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return prefix
+  const now = new Date()
+  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  if (sameLocalDay(date, now)) return `${prefix} today at ${time}`
+  return `${prefix} ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${time}`
+}
+
+function scheduleHandoffStatusCopy(entry: ScheduleHandoffHistoryEntry | null) {
+  if (!entry) {
+    return {
+      detail: 'Local only until sent.',
+      headline: 'Not sent to StrideSync yet',
+    }
+  }
+  if (entry.status === 'opened') {
+    return {
+      detail: entry.attemptCount > 1
+        ? `Sent ${entry.attemptCount} times from this browser. Open StrideSync to apply.`
+        : 'Open StrideSync to apply.',
+      headline: formatScheduleHandoffTimestamp('Sent to StrideSync', entry.updatedAt),
+    }
+  }
+  if (entry.status === 'copied') {
+    return {
+      detail: 'Link copied locally. Open StrideSync to apply.',
+      headline: formatScheduleHandoffTimestamp('Link copied', entry.updatedAt),
+    }
+  }
+  if (entry.status === 'dismissed') {
+    return {
+      detail: 'Dismissed locally. You can send it again.',
+      headline: formatScheduleHandoffTimestamp('Handoff dismissed', entry.updatedAt),
+    }
+  }
+  if (entry.status === 'superseded') {
+    return {
+      detail: 'A newer handoff replaced this one.',
+      headline: 'Earlier handoff superseded',
+    }
+  }
+  return {
+    detail: 'Ready to send when you want StrideSync to see it.',
+    headline: formatScheduleHandoffTimestamp('Handoff generated', entry.updatedAt),
+  }
+}
+
 export function WorkoutDetailSheet({
   workout,
   week1Start,
@@ -77,6 +136,7 @@ export function WorkoutDetailSheet({
   basePlan,
   planId,
   profileId,
+  scheduleHandoffHistory,
   onClose,
   onStatus,
   onSaveModification,
@@ -84,6 +144,7 @@ export function WorkoutDetailSheet({
   onToggleFlag,
   onSaveScheduleAdjustments,
   onUndoScheduleAdjustment,
+  onScheduleHandoffOpened,
 }: {
   workout: Workout | null
   week1Start: string
@@ -98,6 +159,7 @@ export function WorkoutDetailSheet({
   basePlan: WeekPlan[]
   planId: string
   profileId: string
+  scheduleHandoffHistory: ScheduleHandoffHistoryEntry[]
   onClose: () => void
   onStatus: (status?: WorkoutStatus) => void
   onSaveModification: (summary: string) => void
@@ -105,6 +167,7 @@ export function WorkoutDetailSheet({
   onToggleFlag: (flag: PainFlag) => void
   onSaveScheduleAdjustments: (adjustments: ScheduleAdjustment[]) => void
   onUndoScheduleAdjustment: (adjustmentId: string, assignedDate: string, workoutId: string) => void
+  onScheduleHandoffOpened: (payload: StrideSyncScheduleHandoffPayload, url: string) => void
 }) {
   const [introIndex, setIntroIndex] = useState<number | null>(null)
   const [introDone, setIntroDone] = useState(false)
@@ -214,8 +277,8 @@ export function WorkoutDetailSheet({
   const pairedWorkout = pairedSwapAdjustment
     ? basePlan.flatMap((week) => week.days).find((entry) => entry.id === pairedSwapAdjustment.workoutId) ?? null
     : null
-  const scheduleHandoff = activeAdjustment
-    ? buildStrideSyncScheduleHandoffUrl({
+  const scheduleHandoffPayload = activeAdjustment
+    ? {
       actionType: activeAdjustment.action === 'repeat_week' ? 'moved' : activeAdjustment.action,
       adjustmentId: activeAdjustment.id,
       assignedDate: activeAdjustment.assignedDate,
@@ -235,8 +298,18 @@ export function WorkoutDetailSheet({
       pairedWorkoutId: pairedSwapAdjustment?.workoutId,
       pairedWorkoutName: pairedWorkout?.name,
       swapGroupId: activeAdjustment.swapGroupId,
-    })
+    } satisfies StrideSyncScheduleHandoffPayload
     : null
+  const scheduleHandoff = scheduleHandoffPayload
+    ? buildStrideSyncScheduleHandoffUrl(scheduleHandoffPayload)
+    : null
+  const scheduleHandoffEntry = scheduleHandoff
+    ? scheduleHandoffHistory.find((entry) => entry.scheduleHandoffId === scheduleHandoff.scheduleHandoffId) ?? null
+    : null
+  const scheduleHandoffSummary = scheduleHandoffPayload
+    ? buildScheduleHandoffSummary(scheduleHandoffPayload)
+    : null
+  const scheduleHandoffCopy = scheduleHandoffStatusCopy(scheduleHandoffEntry)
 
   function makeAdjustment(action: ScheduleAdjustment['action'], nextAssignedDate = assignedDate, extra: Partial<ScheduleAdjustment> = {}): ScheduleAdjustment {
     const now = new Date().toISOString()
@@ -371,7 +444,8 @@ export function WorkoutDetailSheet({
   }
 
   function openStrideSyncScheduleHandoff() {
-    if (!scheduleHandoff) return
+    if (!scheduleHandoff || !scheduleHandoffPayload) return
+    onScheduleHandoffOpened(scheduleHandoffPayload, scheduleHandoff.url)
     window.location.assign(scheduleHandoff.url)
   }
 
@@ -492,8 +566,13 @@ export function WorkoutDetailSheet({
           </p>
           {scheduleHandoff ? (
             <section className="schedule-handoff-callout" aria-label="StrideSync schedule handoff">
+              <div className="schedule-handoff-status">
+                <strong>{scheduleHandoffCopy.headline}</strong>
+                <em>{scheduleHandoffCopy.detail}</em>
+                {scheduleHandoffSummary ? <span>{scheduleHandoffSummary}</span> : null}
+              </div>
               <p className="schedule-helper-copy">
-                Schedule changes are local. Send this adjustment to StrideSync if you want matching to follow it there too.
+                Schedule changes are local. Send this adjustment to StrideSync if you want matching to follow it there too. This phone cannot confirm whether StrideSync applied it yet.
               </p>
               <button className="secondary-button schedule-handoff-button" type="button" onClick={openStrideSyncScheduleHandoff}>
                 Send to StrideSync

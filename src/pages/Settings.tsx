@@ -3,6 +3,7 @@ import { ThemeToggle } from '../components/ThemeToggle'
 import { trainingPlanProfiles, type PlanId, type TrainingPlanProfile } from '../data/trainingPlan'
 import type { useProgress } from '../hooks/useProgress'
 import type { SettingsState } from '../hooks/useSettings'
+import type { ScheduleHandoffHistoryEntry } from '../lib/strideSyncScheduleHandoff'
 import type { StrideSyncHandoffHistoryEntry } from '../lib/strideSyncHandoff'
 import { raceDateFromWeek1, week1FromRaceDate } from '../utils/dates'
 
@@ -15,7 +16,9 @@ export function Settings({
   progressApi,
   activeProfile,
   automationHistory,
+  scheduleHandoffHistory,
   onClearAutomationHistory,
+  onClearScheduleHandoffHistory,
   onPlanChange,
 }: {
   settings: SettingsState
@@ -24,7 +27,9 @@ export function Settings({
   progressApi: ProgressApi
   activeProfile: TrainingPlanProfile
   automationHistory: StrideSyncHandoffHistoryEntry[]
+  scheduleHandoffHistory: ScheduleHandoffHistoryEntry[]
   onClearAutomationHistory: () => void
+  onClearScheduleHandoffHistory: () => void
   onPlanChange: (planId: PlanId) => void
 }) {
   function exportProgress() {
@@ -136,6 +141,35 @@ export function Settings({
             <p className="settings-note">Receipts stay in this browser only and do not affect workout progress.</p>
           )}
         </details>
+        <details className="automation-history">
+          <summary>
+            <span>
+              <strong>Schedule handoff history</strong>
+              <em>{scheduleHandoffHistory.length ? `${Math.min(scheduleHandoffHistory.length, 10)} recent receipt${scheduleHandoffHistory.length === 1 ? '' : 's'}` : 'No schedule sends yet'}</em>
+            </span>
+          </summary>
+          {scheduleHandoffHistory.length ? (
+            <>
+              <div className="automation-history-list">
+                {scheduleHandoffHistory.slice(0, 10).map((entry) => (
+                  <article className="automation-history-row" key={entry.id}>
+                    <div>
+                      <strong>{scheduleHistoryTitle(entry)}</strong>
+                      <span>{scheduleHistoryMeta(entry)}</span>
+                      <em>{scheduleHistoryNote(entry)}</em>
+                    </div>
+                    <span className={`automation-status-pill ${entry.status}`}>{scheduleHistoryStatus(entry)}</span>
+                  </article>
+                ))}
+              </div>
+              <button className="secondary-button full-width" type="button" onClick={onClearScheduleHandoffHistory}>
+                Clear schedule handoff history
+              </button>
+            </>
+          ) : (
+            <p className="settings-note">Schedule handoff receipts stay in this browser only and cannot confirm whether StrideSync applied the change.</p>
+          )}
+        </details>
       </section>
       <section className="settings-panel">
         <h2>Data</h2>
@@ -178,6 +212,34 @@ function historyStatus(entry: StrideSyncHandoffHistoryEntry) {
   return 'Undone'
 }
 
+function scheduleHistoryTitle(entry: ScheduleHandoffHistoryEntry) {
+  return entry.summary
+}
+
+function scheduleHistoryMeta(entry: ScheduleHandoffHistoryEntry) {
+  return [scheduleHistoryStatus(entry), formatHistoryDateTime(entry.updatedAt)].filter(Boolean).join(' · ')
+}
+
+function scheduleHistoryNote(entry: ScheduleHandoffHistoryEntry) {
+  if (entry.status === 'opened') {
+    return entry.attemptCount > 1
+      ? `Opened ${entry.attemptCount} times from this browser. This phone cannot confirm whether StrideSync applied it.`
+      : 'Open StrideSync to apply. This phone cannot confirm whether StrideSync applied it.'
+  }
+  if (entry.status === 'copied') return 'Link copied locally. Open StrideSync to apply. This phone cannot confirm whether StrideSync applied it.'
+  if (entry.status === 'dismissed') return 'Dismissed locally. This phone cannot confirm whether StrideSync applied it.'
+  if (entry.status === 'superseded') return 'Older handoff kept for reference only.'
+  return 'Generated locally. This phone cannot confirm whether StrideSync applied it.'
+}
+
+function scheduleHistoryStatus(entry: ScheduleHandoffHistoryEntry) {
+  if (entry.status === 'opened') return 'Sent to StrideSync'
+  if (entry.status === 'copied') return 'Link copied'
+  if (entry.status === 'dismissed') return 'Dismissed'
+  if (entry.status === 'superseded') return 'Superseded'
+  return 'Generated'
+}
+
 function formatMiles(value?: string) {
   const numericValue = Number(value)
   return Number.isFinite(numericValue) ? `${numericValue.toFixed(2)} mi` : null
@@ -186,4 +248,15 @@ function formatMiles(value?: string) {
 function formatMinutes(value?: string) {
   const numericValue = Number(value)
   return Number.isFinite(numericValue) ? `${Math.round(numericValue)} min` : null
+}
+
+function formatHistoryDateTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }

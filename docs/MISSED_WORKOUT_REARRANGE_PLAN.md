@@ -4,6 +4,30 @@ This is a design-only plan for missed workouts, schedule rearrangement, safe ski
 
 No runtime code is implemented in this phase. No Firebase, Firestore, Strava sync, RunActivity persistence, Half_Ass auto-accept behavior, StrideSync cloud sync behavior, or planned-vs-actual scoring behavior should change in Phase 12C.
 
+## Phase 12M Schedule Adjustment Handoff Status And History
+
+Phase 12M adds sender-side local receipts inside Half_Ass for schedule-adjustment handoffs that the user opens toward StrideSync. This is still local-only history in Half_Ass and does not add any StrideSync runtime changes, shared persistence, or confirmation callback path.
+
+What Phase 12M adds:
+
+- A new local-only history key: `half_ass_schedule_handoff_history_v1:<planId>`.
+- Per-plan handoff receipt entries for schedule-adjustment sends with compact metadata such as:
+  - `scheduleHandoffId`
+  - workout/date/action summary
+  - local status like `generated`, `opened`, `copied`, `dismissed`, or `superseded`
+  - local timestamps and latest attempt count
+- Compact status copy near `Send to StrideSync` in the workout detail sheet so the user can tell whether the current adjustment was already sent from this browser.
+- An optional collapsed Settings view for recent schedule handoff receipts, plus a clear-history control that only clears this receipt list.
+
+Important limits for Phase 12M:
+
+- This history is local-only. It cannot confirm whether StrideSync applied the change.
+- Half_Ass may record that a handoff URL was generated, opened, copied, dismissed, or superseded, but not that it was applied in StrideSync.
+- The schedule adjustment source of truth remains `half_ass_schedule_adjustments_v1:<planId>`.
+- No Firebase / Firestore reads or writes are added.
+- No StrideSync runtime code is modified.
+- Existing Half_Ass StrideSync auto-accept run handoff behavior remains unchanged.
+
 ## Phase 12J Schedule Adjustment Handoff Sender
 
 Phase 12J adds a sender-side StrideSync bridge inside Half_Ass only. After a local skip, move, swap, cross-training substitution, missed-state decision, or restore action exists on a workout, Half_Ass can generate a StrideSync URL handoff that opens the StrideSync Training tab with schedule-adjustment metadata in the query string.
