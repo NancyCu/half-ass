@@ -314,14 +314,15 @@ export function resolveAdjustedWorkoutForDate(
 ): ResolvedAdjustedWorkout {
   const targetDate = dateKey(date)
   const active = getActiveScheduleAdjustments(adjustments)
+  const newestActive = [...active].reverse()
   const baseDateByWorkoutId = getBaseDateByWorkoutId(basePlan, week1StartISO)
   const baseWorkoutByDate = getBaseWorkoutByDate(basePlan, week1StartISO)
-  const movedAway = active.find((adjustment) => (
+  const movedAway = newestActive.find((adjustment) => (
     adjustment.action !== 'restored'
     && !sameDate(adjustment.originalDate, adjustment.assignedDate)
     && sameDate(adjustment.originalDate, targetDate)
   ))
-  const assignedAdjustment = active.find((adjustment) => sameDate(adjustment.assignedDate, targetDate))
+  const assignedAdjustment = newestActive.find((adjustment) => sameDate(adjustment.assignedDate, targetDate))
 
   if (assignedAdjustment) {
     const originalWorkout = getWorkoutById(basePlan, assignedAdjustment.workoutId)

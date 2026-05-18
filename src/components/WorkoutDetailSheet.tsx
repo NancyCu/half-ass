@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
-import type { Workout } from '../data/trainingPlan'
+import type { WeekPlan, Workout } from '../data/trainingPlan'
 import type { Zone } from '../data/zones'
 import type { PainFlag, WorkoutStatus } from '../hooks/useProgress'
-import { getWorkoutSegments } from '../utils/workouts'
+import {
+  evaluateScheduleAdjustment,
+  type CrossTrainingType,
+  type ResolvedAdjustedWorkout,
+  type ScheduleAdjustment,
+  type ScheduleAdjustmentState,
+  type ScheduleGuardrailResult,
+} from '../lib/scheduleAdjustments'
+import { toISODate } from '../utils/dates'
+import { getWorkoutSegments, workoutISO } from '../utils/workouts'
 import { GarminCopyButton } from './GarminCopyButton'
 import { ZoneChips } from './ZoneChips'
 
@@ -16,6 +25,28 @@ const flagLabels: Record<PainFlag, string> = {
   'HR too high': 'HR High',
 }
 
+const crossTrainingOptions: Array<{ value: CrossTrainingType; label: string }> = [
+  { value: 'cycling', label: 'Bike' },
+  { value: 'elliptical', label: 'Elliptical' },
+  { value: 'walking', label: 'Walk' },
+  { value: 'other', label: 'Other' },
+]
+
+function createAdjustmentId(action: string, workoutId: string) {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `${action}-${workoutId}-${Date.now()}`
+}
+
+function todayISO() {
+  return toISODate(new Date())
+}
+
+function guardrailLabel(result: ScheduleGuardrailResult) {
+  if (result.severity === 'blocked') return 'Blocked'
+  if (result.severity === 'caution') return 'Caution'
+  return 'Safe'
+}
+
 export function WorkoutDetailSheet({
   workout,
   week1Start,
@@ -25,11 +56,18 @@ export function WorkoutDetailSheet({
   note,
   modificationSummary,
   selectedFlags,
+  selectedResolvedWorkout,
+  scheduleAdjustments,
+  basePlan,
+  planId,
+  profileId,
   onClose,
   onStatus,
   onSaveModification,
   onNote,
   onToggleFlag,
+  onSaveScheduleAdjustment,
+  onUndoScheduleAdjustment,
 }: {
   workout: Workout | null
   week1Start: string
@@ -39,16 +77,27 @@ export function WorkoutDetailSheet({
   note?: string
   modificationSummary?: string
   selectedFlags: PainFlag[]
+  selectedResolvedWorkout: ResolvedAdjustedWorkout | null
+  scheduleAdjustments: ScheduleAdjustmentState
+  basePlan: WeekPlan[]
+  planId: string
+  profileId: string
   onClose: () => void
   onStatus: (status?: WorkoutStatus) => void
   onSaveModification: (summary: string) => void
   onNote: (note: string) => void
   onToggleFlag: (flag: PainFlag) => void
+  onSaveScheduleAdjustment: (adjustment: ScheduleAdjustment) => void
+  onUndoScheduleAdjustment: (adjustmentId: string, assignedDate: string, workoutId: string) => void
 }) {
   const [introIndex, setIntroIndex] = useState<number | null>(null)
   const [introDone, setIntroDone] = useState(false)
   const [isModifyOpen, setIsModifyOpen] = useState(false)
+  const [isMoveOpen, setIsMoveOpen] = useState(false)
   const [modificationDraft, setModificationDraft] = useState('')
+  const [moveDate, setMoveDate] = useState('')
+  const [moveResult, setMoveResult] = useState<ScheduleGuardrailResult | null>(null)
+  const [crossTrainingType, setCrossTrainingType] = useState<CrossTrainingType>('cycling')
   const [selectedSegment, setSelectedSegment] = useState<number | null>(null)
 
   const segments = useMemo(() => (workout ? getWorkoutSegments(workout, zoneTargets, zones) : []), [workout, zoneTargets, zones])
@@ -93,10 +142,88 @@ export function WorkoutDetailSheet({
     queueMicrotask(() => {
       setIsModifyOpen(false)
       setModificationDraft(modificationSummary ?? '')
+      setIsMoveOpen(false)
+      setMoveResult(null)
     })
   }, [modificationSummary, workout?.id])
 
   if (!workout) return null
+
+  const activeWorkout = workout
+  const originalDate = selectedResolvedWorkout?.originalDate ?? workoutISO(activeWorkout, week1Start)
+  const assignedDate = selectedResolvedWorkout?.assignedDate ?? originalDate
+  const activeAdjustment = selectedResolvedWorkout?.adjustment?.status === 'active' ? selectedResolvedWorkout.adjustment : null
+  const scheduleLabel = selectedResolvedWorkout?.isSkipped
+    ? 'Skipped'
+    : selectedResolvedWorkout?.isCrossTraining
+      ? 'Cross-training substitute'
+      : activeAdjustment?.action === 'moved'
+        ? `Moved from ${activeAdjustment.originalDate}`
+        : activeAdjustment
+          ? 'Adjusted'
+          : 'Original plan'
+
+  function makeAdjustment(action: ScheduleAdjustment['action'], nextAssignedDate = assignedDate, extra: Partial<ScheduleAdjustment> = {}): ScheduleAdjustment {
+    const now = new Date().toISOString()
+    return {
+      id: createAdjustmentId(action, activeWorkout.id),
+      planId,
+      profileId,
+      workoutId: activeWorkout.id,
+      originalDate,
+      assignedDate: nextAssignedDate,
+      action,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+      source: 'user',
+      guardrailWarnings: [],
+      ...extra,
+    }
+  }
+
+  function saveSkip() {
+    if (!window.confirm('Skip this workout? This will not count as completed.')) return
+    onSaveScheduleAdjustment(makeAdjustment('skipped', assignedDate, { reason: 'User skipped workout' }))
+  }
+
+  function previewMove(nextDate: string) {
+    setMoveDate(nextDate)
+    if (!nextDate) {
+      setMoveResult(null)
+      return
+    }
+    const candidate = makeAdjustment('moved', nextDate)
+    setMoveResult(evaluateScheduleAdjustment(basePlan, candidate, scheduleAdjustments, week1Start))
+  }
+
+  function saveMove() {
+    if (!moveDate || !moveResult) return
+    if (!moveResult.allowed) return
+    const message = moveResult.severity === 'caution'
+      ? `${moveResult.warnings.join('\n')}\n\nMove anyway?`
+      : `Move this workout to ${moveDate}?`
+    if (!window.confirm(message)) return
+    onSaveScheduleAdjustment(makeAdjustment('moved', moveDate, { guardrailWarnings: moveResult.warnings }))
+    setIsMoveOpen(false)
+  }
+
+  function saveCrossTraining() {
+    if (!window.confirm('Replace this run with a cross-training substitute? Completion still stays manual.')) return
+    onSaveScheduleAdjustment(makeAdjustment('cross_train', assignedDate, {
+      crossTrainingType,
+      reason: 'User selected cross-training substitute',
+    }))
+  }
+
+  function undoAdjustment() {
+    if (!activeAdjustment) return
+    const warning = status === 'completed'
+      ? 'This workout has completion data. Undoing the schedule adjustment will not delete completion records. Continue?'
+      : 'Undo this schedule adjustment?'
+    if (!window.confirm(warning)) return
+    onUndoScheduleAdjustment(activeAdjustment.id, activeAdjustment.originalDate, activeAdjustment.workoutId)
+  }
 
   const activeSegmentIndex = selectedSegment ?? introIndex
   const activeSegment = activeSegmentIndex === null ? null : segments[activeSegmentIndex]
@@ -114,6 +241,12 @@ export function WorkoutDetailSheet({
         </button>
         <p className="eyebrow">Week {workout.week} · {workout.dayName}</p>
         <h2 id="detail-title">{workout.name}</h2>
+        <div className="schedule-summary-row" aria-label="Schedule assignment">
+          <span className={`schedule-pill ${selectedResolvedWorkout?.isSkipped ? 'skipped' : selectedResolvedWorkout?.isCrossTraining ? 'cross-train' : activeAdjustment ? 'moved' : 'safe'}`}>
+            {scheduleLabel}
+          </span>
+          <span>{assignedDate}</span>
+        </div>
         <div className="meta-grid prominent">
           <span><small>Time / Distance</small>{workout.miles ? `${workout.miles} mi` : workout.duration}</span>
           <span className={activeTargetClass}><small>Target HR</small>{displayedTargetBpm}</span>
@@ -145,6 +278,49 @@ export function WorkoutDetailSheet({
         </ol>
         <p className="detail-note">{workout.notes}</p>
         <GarminCopyButton workout={workout} week1Start={week1Start} />
+        <section className="schedule-adjustment-panel" aria-label="Schedule adjustment">
+          <div className="schedule-adjustment-header">
+            <div>
+              <p className="eyebrow">Schedule adjustment</p>
+              <strong>{activeAdjustment ? 'Active overlay' : 'Original schedule'}</strong>
+            </div>
+            {activeAdjustment ? <button className="secondary-button schedule-undo-button" type="button" onClick={undoAdjustment}>Undo adjustment</button> : null}
+          </div>
+          <div className="button-row compact schedule-action-row">
+            <button type="button" onClick={saveSkip}>Skip</button>
+            <button
+              type="button"
+              onClick={() => {
+                const initialDate = assignedDate || originalDate || todayISO()
+                setIsMoveOpen((open) => !open)
+                previewMove(initialDate)
+              }}
+            >
+              Move
+            </button>
+            <button type="button" onClick={saveCrossTraining}>Cross-train</button>
+          </div>
+          <label className="schedule-cross-train-select">
+            <span>Cross-training type</span>
+            <select aria-label="Cross-training type" value={crossTrainingType} onChange={(event) => setCrossTrainingType(event.target.value as CrossTrainingType)}>
+              {crossTrainingOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          {isMoveOpen ? (
+            <div className="schedule-move-panel">
+              <label>
+                <span>Move to date</span>
+                <input type="date" value={moveDate} onChange={(event) => previewMove(event.target.value)} />
+              </label>
+              {moveResult ? (
+                <p className={`guardrail-result ${moveResult.severity}`}>
+                  <strong>{guardrailLabel(moveResult)}:</strong> {moveResult.warnings[0] ?? moveResult.recommendation}
+                </p>
+              ) : null}
+              <button className="primary-button" type="button" disabled={!moveResult?.allowed} onClick={saveMove}>Save move</button>
+            </div>
+          ) : null}
+        </section>
         <div className="button-row">
           <button className="primary-button" type="button" onClick={() => onStatus(status === 'completed' ? undefined : 'completed')}>
             {status === 'completed' ? 'Undo Complete' : 'Complete Workout'}

@@ -5,6 +5,13 @@ import { WorkoutDetailSheet } from './components/WorkoutDetailSheet'
 import { getTrainingPlanProfile, trainingPlanProfiles, type PlanId, type Workout } from './data/trainingPlan'
 import { mannyZoneTargets, mannyZones, zoneTargets, zones } from './data/zones'
 import { useProgress } from './hooks/useProgress'
+import {
+  addScheduleAdjustment,
+  readScheduleAdjustments,
+  resolveAdjustedWorkoutForDate,
+  undoScheduleAdjustment,
+  type ScheduleAdjustment,
+} from './lib/scheduleAdjustments'
 import { effectiveWorkoutStatus } from './lib/workoutProgress'
 import {
   cleanStrideSyncHandoffParamsFromUrl,
@@ -28,14 +35,22 @@ import { Zones } from './pages/Zones'
 
 function App() {
   const [screen, setScreen] = useState<Screen>('dashboard')
-  const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null)
+  const [selectedWorkoutEntry, setSelectedWorkoutEntry] = useState<SelectedWorkoutEntry | null>(null)
   const [handoffNotice, setHandoffNotice] = useState<HandoffNotice | null>(null)
   const [, setHandoffHistoryVersion] = useState(0)
+  const [, setScheduleAdjustmentVersion] = useState(0)
   const { settings, updateSettings, resetSettings } = useSettings()
   const activeProfile = getTrainingPlanProfile(settings.planId)
   const activeZones = activeProfile.id === 'manny' ? mannyZones : zones
   const activeZoneTargets = activeProfile.id === 'manny' ? mannyZoneTargets : zoneTargets
   const progressApi = useProgress(activeProfile.id, activeProfile.allWorkouts)
+  const scheduleAdjustments = typeof window === 'undefined'
+    ? { schemaVersion: 1 as const, planId: activeProfile.id, updatedAt: new Date(0).toISOString(), adjustments: [] }
+    : readScheduleAdjustments(activeProfile.id)
+  const selectedResolvedWorkout = selectedWorkoutEntry?.assignedDate
+    ? resolveAdjustedWorkoutForDate(activeProfile.trainingPlan, selectedWorkoutEntry.assignedDate, scheduleAdjustments, settings.week1Start)
+    : null
+  const selectedWorkout = selectedResolvedWorkout?.workout ?? selectedWorkoutEntry?.workout ?? null
   const selectedProgress = selectedWorkout ? progressApi.progress.workouts[selectedWorkout.id] : undefined
   const selectedStatus = effectiveWorkoutStatus(selectedProgress)
   const [handoff, setHandoff] = useState<StrideSyncHandoff | null>(() =>
@@ -134,7 +149,29 @@ function App() {
 
   function switchPlan(planId: PlanId) {
     updateSettings({ planId })
-    setSelectedWorkout(null)
+    setSelectedWorkoutEntry(null)
+  }
+
+  function openWorkout(workout: Workout, assignedDate?: string) {
+    setSelectedWorkoutEntry({ workout, assignedDate })
+  }
+
+  function saveScheduleAdjustment(adjustment: ScheduleAdjustment) {
+    addScheduleAdjustment(activeProfile.id, adjustment)
+    setScheduleAdjustmentVersion((version) => version + 1)
+    const adjustedWorkout = activeProfile.allWorkouts.find((workout) => workout.id === adjustment.workoutId)
+    if (adjustedWorkout) {
+      setSelectedWorkoutEntry({ workout: adjustedWorkout, assignedDate: adjustment.assignedDate })
+    }
+  }
+
+  function undoSelectedScheduleAdjustment(adjustmentId: string, assignedDate: string, workoutId: string) {
+    undoScheduleAdjustment(activeProfile.id, adjustmentId)
+    setScheduleAdjustmentVersion((version) => version + 1)
+    const workout = activeProfile.allWorkouts.find((entry) => entry.id === workoutId)
+    if (workout) {
+      setSelectedWorkoutEntry({ workout, assignedDate })
+    }
   }
 
   function clearHandoff(recordDismissed = true) {
@@ -184,17 +221,24 @@ function App() {
           profile={activeProfile}
           week1Start={settings.week1Start}
           progressApi={progressApi}
-          onOpenWorkout={setSelectedWorkout}
+          scheduleAdjustments={scheduleAdjustments}
+          onOpenWorkout={openWorkout}
           planSwitcher={<PlanSwitcher activePlanId={activeProfile.id} onChange={switchPlan} />}
         />
       ) : null}
       {screen === 'calendar' ? (
-        <Calendar profile={activeProfile} week1Start={settings.week1Start} progressApi={progressApi} onOpenWorkout={setSelectedWorkout} />
+        <Calendar
+          profile={activeProfile}
+          week1Start={settings.week1Start}
+          progressApi={progressApi}
+          scheduleAdjustments={scheduleAdjustments}
+          onOpenWorkout={openWorkout}
+        />
       ) : null}
       {screen === 'zones' ? <Zones profile={activeProfile} zones={activeZones} /> : null}
       {screen === 'library' ? <WorkoutLibrary profile={activeProfile} /> : null}
       {screen === 'progress' ? (
-        <Progress profile={activeProfile} week1Start={settings.week1Start} progressApi={progressApi} onOpenWorkout={setSelectedWorkout} />
+        <Progress profile={activeProfile} week1Start={settings.week1Start} progressApi={progressApi} onOpenWorkout={openWorkout} />
       ) : null}
       {screen === 'settings' ? (
         <Settings
@@ -218,11 +262,18 @@ function App() {
         note={selectedProgress?.note}
         modificationSummary={selectedProgress?.modification?.summary}
         selectedFlags={selectedProgress?.flags ?? []}
-        onClose={() => setSelectedWorkout(null)}
+        selectedResolvedWorkout={selectedResolvedWorkout}
+        scheduleAdjustments={scheduleAdjustments}
+        basePlan={activeProfile.trainingPlan}
+        planId={activeProfile.id}
+        profileId={activeProfile.id}
+        onClose={() => setSelectedWorkoutEntry(null)}
         onStatus={(status) => selectedWorkout && progressApi.setStatus(selectedWorkout.id, status)}
         onSaveModification={(summary) => selectedWorkout && progressApi.saveModification(selectedWorkout.id, summary)}
         onNote={(note) => selectedWorkout && progressApi.setNote(selectedWorkout.id, note)}
         onToggleFlag={(flag) => selectedWorkout && progressApi.toggleFlag(selectedWorkout.id, flag)}
+        onSaveScheduleAdjustment={saveScheduleAdjustment}
+        onUndoScheduleAdjustment={undoSelectedScheduleAdjustment}
       />
     </div>
   )
@@ -232,6 +283,11 @@ type HandoffNotice = {
   detail?: string
   title: string
   tone: 'success' | 'warning'
+}
+
+type SelectedWorkoutEntry = {
+  workout: Workout
+  assignedDate?: string
 }
 
 function cleanStrideSyncHandoffParams() {

@@ -99,6 +99,7 @@ const skippedResolution = resolveAdjustedWorkoutForDate(profile.trainingPlan, '2
 assert.equal(skippedResolution.workout?.id, tuesdayFastFinish.id)
 assert.equal(skippedResolution.isSkipped, true)
 assert.equal(skippedResolution.isAdjusted, true)
+assert.notEqual(effectiveWorkoutStatus({}), 'completed', 'schedule skip is separate from completion status')
 
 const moved = adjustment({
   id: 'move-foundation-open-day',
@@ -114,6 +115,18 @@ assert.equal(moveOriginal.originalWorkout?.id, mondayFoundation.id)
 assert.equal(moveTarget.workout?.id, mondayFoundation.id)
 assert.equal(moveTarget.originalDate, '2026-05-11')
 assert.equal(moveTarget.assignedDate, '2026-08-25')
+assert.notEqual(effectiveWorkoutStatus({}), 'completed', 'schedule move is separate from completion status')
+
+const movedThenSkipped = adjustment({
+  id: 'skip-moved-foundation',
+  workoutId: mondayFoundation.id,
+  originalDate: '2026-05-11',
+  assignedDate: '2026-08-25',
+  action: 'skipped',
+})
+const movedThenSkippedResolution = resolveAdjustedWorkoutForDate(profile.trainingPlan, '2026-08-25', [moved, movedThenSkipped], week1Start)
+assert.equal(movedThenSkippedResolution.workout?.id, mondayFoundation.id)
+assert.equal(movedThenSkippedResolution.isSkipped, true)
 
 const swapMonday = adjustment({
   id: 'swap-monday-to-wednesday',

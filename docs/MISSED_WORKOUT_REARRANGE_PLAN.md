@@ -608,3 +608,16 @@ Verification added:
 ```bash
 npm run test:schedule-adjustments
 ```
+
+## Phase 12E Implementation Notes
+
+Phase 12E adds the first user-facing schedule adjustment MVP on top of the Phase 12D local overlay. The visible app can now:
+
+- show adjusted schedule badges in Dashboard and Calendar
+- open a workout with assigned-date context
+- skip a workout through a schedule adjustment without marking it completed
+- move a workout to another date after guardrail evaluation
+- replace a workout with a cross-training substitute while preserving structure/zones
+- undo an active schedule adjustment conservatively
+
+The MVP intentionally defers full Swap UI and Repeat Week UI. It does not add StrideSync integration, Firestore/shared persistence, deployment behavior, or any change to Half_Ass auto-accept handoffs. The base plan remains immutable, and completed green dots remain tied only to progress completion state.

@@ -5,8 +5,14 @@ import { ZoneChips } from '../components/ZoneChips'
 import type { TrainingPlanProfile, WeekPlan, Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import type { ManualRunEntry, useProgress } from '../hooks/useProgress'
+import {
+  getAdjustedWeekSchedule,
+  resolveAdjustedWorkoutForDate,
+  type ResolvedAdjustedWorkout,
+  type ScheduleAdjustmentState,
+} from '../lib/scheduleAdjustments'
 import { effectiveWorkoutStatus } from '../lib/workoutProgress'
-import { getMonday, parseISODate, toISODate } from '../utils/dates'
+import { addDays, getMonday, parseISODate, toISODate } from '../utils/dates'
 import { getCurrentWeek, getPlanTiming, getWorkoutForDate, workoutDateLabel } from '../utils/workouts'
 
 type ProgressApi = ReturnType<typeof useProgress>
@@ -96,18 +102,30 @@ function progressColor(percent: number) {
   return `rgb(${r}, ${g}, ${b})`
 }
 
+function scheduleBadgeFor(resolved: ResolvedAdjustedWorkout | null, assignedDate: string) {
+  const adjustment = resolved?.adjustment
+  if (!adjustment) return null
+  if (resolved?.isSkipped) return { className: 'skipped', label: 'Skipped' }
+  if (resolved?.isCrossTraining) return { className: 'cross-train', label: 'Cross-train' }
+  if (adjustment.action === 'moved' && adjustment.assignedDate === assignedDate) return { className: 'moved', label: 'Moved here' }
+  if (adjustment.action === 'moved') return { className: 'moved', label: 'Moved' }
+  return { className: 'adjusted', label: 'Adjusted' }
+}
+
 export function Dashboard({
   week1Start,
   progressApi,
   onOpenWorkout,
   profile,
   planSwitcher,
+  scheduleAdjustments,
 }: {
   profile: TrainingPlanProfile
   week1Start: string
   progressApi: ProgressApi
-  onOpenWorkout: (workout: Workout) => void
+  onOpenWorkout: (workout: Workout, assignedDate?: string) => void
   planSwitcher?: ReactNode
+  scheduleAdjustments: ScheduleAdjustmentState
 }) {
   const { allWorkouts, trainingPlan } = profile
   const [drillWeek, setDrillWeek] = useState<number | null>(null)
@@ -120,11 +138,14 @@ export function Dashboard({
   const [manualRunPace, setManualRunPace] = useState('')
   const [manualRunHr, setManualRunHr] = useState('')
   const [selectedManualRun, setSelectedManualRun] = useState<ManualRunEntry | null>(null)
-  const todayWorkout = getWorkoutForDate(new Date(), week1Start, allWorkouts)
-  const today = todayWorkout ?? trainingPlan[0].days[0]
   const todayISO = toISODate(new Date())
+  const todayResolved = resolveAdjustedWorkoutForDate(trainingPlan, todayISO, scheduleAdjustments, week1Start)
+  const todayWorkout = todayResolved.isAdjusted
+    ? todayResolved.workout ?? todayResolved.originalWorkout
+    : getWorkoutForDate(new Date(), week1Start, allWorkouts)
+  const today = todayWorkout ?? trainingPlan[0].days[0]
   const weekStartISO = toISODate(getMonday(new Date()))
-  const isWorkoutToday = Boolean(todayWorkout)
+  const isWorkoutToday = Boolean(todayResolved.workout ?? todayWorkout)
   const currentWeek = getCurrentWeek(week1Start, trainingPlan)
   const planTiming = getPlanTiming(week1Start, trainingPlan)
   const activeWeekNumber = planTiming.state === 'active' ? planTiming.weekNumber : null
@@ -132,16 +153,19 @@ export function Dashboard({
   const todayLibrary = getWorkoutLibraryEntry(today.type)
   const todayProgress = progressApi.progress.workouts[today.id]
   const todayStatus = effectiveWorkoutStatus(todayProgress)
-  const weeklyDone = currentWeek.days.filter((workout) => effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) === 'completed').length
-  const weeklyMiles = estimatedWeekMiles(currentWeek.days)
-  const weeklyLongRun = currentWeek.days.find((workout) => isLongWorkout(workout))
-  const weeklyQuality = currentWeek.days.filter((workout) => isQualityWorkout(workout)).length
+  const currentWeekStartISO = toISODate(addDays(parseISODate(week1Start), (currentWeek.week - 1) * 7))
+  const adjustedCurrentWeek = getAdjustedWeekSchedule(trainingPlan, currentWeekStartISO, 7, scheduleAdjustments, week1Start)
+  const adjustedCurrentWeekWorkouts = adjustedCurrentWeek.map((entry) => entry.workout).filter((workout): workout is Workout => Boolean(workout))
+  const weeklyDone = adjustedCurrentWeekWorkouts.filter((workout) => effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) === 'completed').length
+  const weeklyMiles = estimatedWeekMiles(adjustedCurrentWeekWorkouts)
+  const weeklyLongRun = adjustedCurrentWeekWorkouts.find((workout) => isLongWorkout(workout))
+  const weeklyQuality = adjustedCurrentWeekWorkouts.filter((workout) => isQualityWorkout(workout)).length
   const compactDate = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())
   const completedWorkouts = allWorkouts.filter((workout) => effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) === 'completed')
   const completedLoad = completedWorkouts.reduce((total, workout) => total + workoutLoad(workout), 0)
   const plannedLoad = allWorkouts.reduce((total, workout) => total + workoutLoad(workout), 0)
-  const currentWeekLoad = currentWeek.days.reduce((total, workout) => total + workoutLoad(workout), 0)
-  const completedWeekLoad = currentWeek.days
+  const currentWeekLoad = adjustedCurrentWeekWorkouts.reduce((total, workout) => total + workoutLoad(workout), 0)
+  const completedWeekLoad = adjustedCurrentWeekWorkouts
     .filter((workout) => effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) === 'completed')
     .reduce((total, workout) => total + workoutLoad(workout), 0)
   const manualRunsThisWeek = (progressApi.progress.manualRuns ?? []).filter((run) => isWithinRange(run.date, weekStartISO, todayISO))
@@ -163,6 +187,7 @@ export function Dashboard({
   const selectedWeek = drillWeek ? trainingPlan.find((week) => week.week === drillWeek) : null
   const activePhaseWeeks = phaseGroups[activePhase] ?? phaseGroups[currentWeek.phase] ?? []
   const distanceOrDuration = today.miles ? `${today.miles} mi` : today.duration
+  const todayScheduleBadge = scheduleBadgeFor(todayResolved, todayISO)
   const workoutTileLabel = isWorkoutToday ? `${today.dayName} · Today` : `${workoutDateLabel(today, week1Start)} · Week ${today.week}`
   const todayNote = todayProgress?.note?.trim()
   const todayFlags = todayProgress?.flags ?? []
@@ -324,10 +349,10 @@ export function Dashboard({
           <span className="upcoming" style={{ flexGrow: Math.max(upcomingCount, 0.25) }}>Upcoming {upcomingCount}</span>
         </div>
       </section>
-      <button className={`dashboard-workout-tile ${todayLibrary.color}`} type="button" onClick={() => onOpenWorkout(today)}>
+      <button className={`dashboard-workout-tile ${todayLibrary.color} ${todayScheduleBadge ? `schedule-${todayScheduleBadge.className}` : ''}`} type="button" onClick={() => onOpenWorkout(today, todayISO)}>
         <span className="workout-tile-topline">
           <span>{workoutTileLabel}</span>
-          {todayStatus ? <em className={`status-pill ${todayStatus}`}>{todayStatus}</em> : <em>Tap for details</em>}
+          {todayStatus ? <em className={`status-pill ${todayStatus}`}>{todayStatus}</em> : todayScheduleBadge ? <em className={`schedule-pill ${todayScheduleBadge.className}`}>{todayScheduleBadge.label}</em> : <em>Tap for details</em>}
         </span>
         <strong>{today.name}</strong>
         <span className="workout-tile-quick-facts">
@@ -415,17 +440,30 @@ export function Dashboard({
           ) : null}
         </section>
         <div className="dashboard-day-list">
-          {currentWeek.days.map((workout) => {
+          {adjustedCurrentWeek.map((entry) => {
+            const workout = entry.workout
+            if (!workout) {
+              return (
+                <button className="dashboard-day-row gray adjusted-empty" key={entry.assignedDate} type="button" disabled>
+                  <span className="dashboard-day-date">{new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(parseISODate(entry.assignedDate)).slice(0, 3)}</span>
+                  <strong>Moved</strong>
+                  <span className="dashboard-day-duration">Open</span>
+                  <span className="schedule-pill moved">Moved</span>
+                </button>
+              )
+            }
             const status = effectiveWorkoutStatus(progressApi.progress.workouts[workout.id])
             const library = getWorkoutLibraryEntry(workout.type)
-            const isTodayWorkout = isWorkoutToday && workout.id === today.id
+            const isTodayWorkout = isWorkoutToday && entry.assignedDate === todayISO
+            const scheduleBadge = scheduleBadgeFor(entry, entry.assignedDate)
             return (
-              <button className={`dashboard-day-row ${library.color} ${status ?? ''} ${isTodayWorkout ? 'today-workout' : ''}`} key={workout.id} type="button" onClick={() => onOpenWorkout(workout)}>
-                <span className="dashboard-day-date">{workout.dayName.slice(0, 3)}</span>
+              <button className={`dashboard-day-row ${library.color} ${status ?? ''} ${isTodayWorkout ? 'today-workout' : ''} ${scheduleBadge ? `schedule-${scheduleBadge.className}` : ''}`} key={`${entry.assignedDate}-${workout.id}`} type="button" onClick={() => onOpenWorkout(workout, entry.assignedDate)}>
+                <span className="dashboard-day-date">{new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(parseISODate(entry.assignedDate)).slice(0, 3)}</span>
                 <strong>{workout.name}</strong>
                 <span className="dashboard-day-duration">{workout.miles ? `${workout.miles} mi` : workout.duration}</span>
                 <ZoneChips zones={workout.zone} compact />
                 {isTodayWorkout ? <span className="today-workout-badge">Today</span> : null}
+                {scheduleBadge ? <span className={`schedule-pill ${scheduleBadge.className}`}>{scheduleBadge.label}</span> : null}
                 {status ? <em className={`status-dot ${status}`} aria-label={status} /> : null}
               </button>
             )

@@ -5,9 +5,14 @@ import { ZoneChips } from '../components/ZoneChips'
 import type { TrainingPlanProfile, WeekPlan, Workout } from '../data/trainingPlan'
 import { getWorkoutLibraryEntry } from '../data/workoutLibrary'
 import type { useProgress } from '../hooks/useProgress'
+import {
+  resolveAdjustedWorkoutForDate,
+  type ResolvedAdjustedWorkout,
+  type ScheduleAdjustmentState,
+} from '../lib/scheduleAdjustments'
 import { effectiveWorkoutStatus } from '../lib/workoutProgress'
 import { addDays, daysBetween, parseISODate, toISODate } from '../utils/dates'
-import { getCurrentWeekNumber, getPrePlanWorkoutForDate, workoutDate } from '../utils/workouts'
+import { getCurrentWeekNumber, getPrePlanWorkoutForDate } from '../utils/workouts'
 
 type ProgressApi = ReturnType<typeof useProgress>
 type CalendarMode = 'week' | 'month' | 'block' | 'full'
@@ -16,6 +21,7 @@ type CalendarDay = {
   date: Date
   iso: string
   workout: Workout | null
+  resolved: ResolvedAdjustedWorkout | null
   inTrainingRange: boolean
   isToday: boolean
 }
@@ -30,23 +36,26 @@ function monthLabel(date: Date) {
   return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date)
 }
 
-function buildMonthDays(monthDate: Date, week1Start: string, workouts: Workout[]): CalendarDay[] {
+function buildMonthDays(monthDate: Date, week1Start: string, profile: TrainingPlanProfile, adjustments: ScheduleAdjustmentState): CalendarDay[] {
   const firstOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)
   const firstGridDate = addDays(firstOfMonth, -((firstOfMonth.getDay() + 6) % 7))
   const firstPlanDate = parseISODate(week1Start)
-  const lastPlanDate = addDays(firstPlanDate, workouts.length - 1)
-  const workoutByISO = new Map(workouts.map((workout) => [toISODate(workoutDate(workout, week1Start)), workout]))
+  const { allWorkouts, trainingPlan } = profile
+  const lastPlanDate = addDays(firstPlanDate, allWorkouts.length - 1)
   const todayISO = toISODate(new Date())
 
   return Array.from({ length: 42 }, (_, index) => {
     const date = addDays(firstGridDate, index)
     const iso = toISODate(date)
-    const prePlanWorkout = getPrePlanWorkoutForDate(date, workouts)
+    const prePlanWorkout = getPrePlanWorkoutForDate(date, allWorkouts)
+    const resolved = prePlanWorkout ? null : resolveAdjustedWorkoutForDate(trainingPlan, iso, adjustments, week1Start)
+    const workout = prePlanWorkout ?? resolved?.workout ?? null
     return {
       date,
       iso,
-      workout: workoutByISO.get(iso) ?? prePlanWorkout,
-      inTrainingRange: Boolean(prePlanWorkout) || (daysBetween(firstPlanDate, date) >= 0 && daysBetween(date, lastPlanDate) >= 0),
+      workout,
+      resolved,
+      inTrainingRange: Boolean(workout) || Boolean(prePlanWorkout) || (daysBetween(firstPlanDate, date) >= 0 && daysBetween(date, lastPlanDate) >= 0),
       isToday: iso === todayISO,
     }
   })
@@ -106,12 +115,14 @@ export function Calendar({
   profile,
   week1Start,
   progressApi,
+  scheduleAdjustments,
   onOpenWorkout,
 }: {
   profile: TrainingPlanProfile
   week1Start: string
   progressApi: ProgressApi
-  onOpenWorkout: (workout: Workout) => void
+  scheduleAdjustments: ScheduleAdjustmentState
+  onOpenWorkout: (workout: Workout, assignedDate?: string) => void
 }) {
   const { allWorkouts, trainingPlan } = profile
   const currentWeek = getCurrentWeekNumber(week1Start, allWorkouts)
@@ -120,7 +131,7 @@ export function Calendar({
   const [visibleMonth, setVisibleMonth] = useState(() => new Date())
   const [selectedRoadmapWeek, setSelectedRoadmapWeek] = useState<WeekPlan | null>(null)
 
-  const monthDays = useMemo(() => buildMonthDays(visibleMonth, week1Start, allWorkouts), [allWorkouts, visibleMonth, week1Start])
+  const monthDays = useMemo(() => buildMonthDays(visibleMonth, week1Start, profile, scheduleAdjustments), [profile, scheduleAdjustments, visibleMonth, week1Start])
   const monthWorkouts = useMemo(
     () => monthDays.filter((day) => day.date.getMonth() === visibleMonth.getMonth() && day.workout),
     [monthDays, visibleMonth],
@@ -185,13 +196,23 @@ export function Calendar({
                 const workout = day.workout
                 const library = workout ? getWorkoutLibraryEntry(workout.type) : null
                 const status = workout ? effectiveWorkoutStatus(progressApi.progress.workouts[workout.id]) : undefined
+                const adjustment = day.resolved?.adjustment ?? null
+                const adjustmentBadge = day.resolved?.isSkipped
+                  ? 'Skipped'
+                  : day.resolved?.isCrossTraining
+                    ? 'Cross-train'
+                    : adjustment?.action === 'moved' && adjustment.assignedDate === day.iso
+                      ? 'Moved here'
+                      : adjustment && adjustment.originalDate === day.iso
+                        ? 'Moved'
+                        : null
                 return (
                   <button
-                    className={['month-day', day.date.getMonth() === visibleMonth.getMonth() ? '' : 'outside-month', day.isToday ? 'today' : '', library?.color ?? 'empty', status ?? ''].filter(Boolean).join(' ')}
+                    className={['month-day', day.date.getMonth() === visibleMonth.getMonth() ? '' : 'outside-month', day.isToday ? 'today' : '', library?.color ?? 'empty', status ?? '', adjustmentBadge ? 'adjusted' : '', day.resolved?.isSkipped ? 'schedule-skipped' : '', day.resolved?.isCrossTraining ? 'cross-training' : ''].filter(Boolean).join(' ')}
                     key={day.iso}
                     type="button"
                     disabled={!workout}
-                    onClick={() => workout && onOpenWorkout(workout)}
+                    onClick={() => workout && onOpenWorkout(workout, day.iso)}
                   >
                     <span className="month-date-number">{day.date.getDate()}</span>
                     {workout ? (
@@ -199,9 +220,10 @@ export function Calendar({
                         <strong className="month-workout-name">{workout.name}</strong>
                         {status === 'completed' ? <span className="month-status-dot" aria-label={status} /> : null}
                         {status === 'modified' ? <em className="month-status-mod">MOD</em> : null}
+                        {adjustmentBadge ? <em className={`schedule-badge ${day.resolved?.isSkipped ? 'skipped' : day.resolved?.isCrossTraining ? 'cross-train' : 'moved'}`}>{adjustmentBadge}</em> : null}
                       </>
                     ) : (
-                      <span className="month-day-type">{day.inTrainingRange ? 'No run' : 'Open'}</span>
+                      <span className="month-day-type">{day.resolved?.adjustment?.action === 'moved' ? 'Moved' : day.inTrainingRange ? 'No run' : 'Open'}</span>
                     )}
                   </button>
                 )
@@ -219,8 +241,16 @@ export function Calendar({
               const workout = day.workout
               const library = getWorkoutLibraryEntry(workout.type)
               const status = effectiveWorkoutStatus(progressApi.progress.workouts[workout.id])
+              const adjustment = day.resolved?.adjustment ?? null
+              const adjustmentBadge = day.resolved?.isSkipped
+                ? 'Skipped'
+                : day.resolved?.isCrossTraining
+                  ? 'Cross-train'
+                  : adjustment?.action === 'moved'
+                    ? 'Moved here'
+                    : null
               return (
-                <button className={`month-agenda-card ${library.color}`} key={workout.id} type="button" onClick={() => onOpenWorkout(workout)}>
+                <button className={`month-agenda-card ${library.color} ${adjustmentBadge ? 'adjusted' : ''}`} key={`${day.iso}-${workout.id}`} type="button" onClick={() => onOpenWorkout(workout, day.iso)}>
                   <span className="agenda-date">{new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(day.date)}</span>
                   <span className="type-badge">{library.name}</span>
                   <strong>{workout.name}</strong>
@@ -232,6 +262,7 @@ export function Calendar({
                   </span>
                   <em>{workout.steps.slice(0, 2).join(' · ')}</em>
                   {status ? <span className={`status-pill ${status}`}>{status}</span> : null}
+                  {adjustmentBadge ? <span className={`schedule-pill ${day.resolved?.isSkipped ? 'skipped' : day.resolved?.isCrossTraining ? 'cross-train' : 'moved'}`}>{adjustmentBadge}</span> : null}
                 </button>
               )
             })}

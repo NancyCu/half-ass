@@ -10,6 +10,7 @@
 - Workout detail sheet must keep status, notes, flags, target HR, target pace, zones, segments, and Garmin helpers.
 - Progress must use `localStorage`; do not replace it with fake state.
 - Schedule adjustments must remain a local overlay using `half_ass_schedule_adjustments_v1:<planId>`; do not mutate the base plan data to skip, move, swap, repeat, or cross-train workouts.
+- Schedule adjustment badges are separate from progress: skipped, moved, and cross-training overlays must not create green completed dots or increase completed counters.
 - Modified and completed workout states must stay separate: opening Modify alone must not write progress, no-op modified records must be ignored, and calendar green dots/counters must mean completed only.
 - Settings must preserve Week 1 start, race-date alignment, theme, import/export, and reset workflows.
 - Do not add backend/cloud sync or direct StrideSync writes without explicit approval.
@@ -76,6 +77,7 @@ When changing progress, review:
 When changing schedule adjustments, review:
 
 - `src/lib/scheduleAdjustments.ts`
+- `src/App.tsx`
 - `scripts/testScheduleAdjustments.ts`
 - `src/utils/workouts.ts`
 - `src/pages/Calendar.tsx`

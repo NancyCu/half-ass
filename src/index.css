@@ -86,11 +86,11 @@ body::before {
   display: none;
 }
 
-button, input, textarea {
+button, input, textarea, select {
   font: inherit;
 }
 
-button, a, input, textarea {
+button, a, input, textarea, select {
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -886,7 +886,8 @@ dt,
 }
 
 textarea,
-input {
+input,
+select {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
@@ -902,7 +903,8 @@ textarea {
 }
 
 textarea:focus,
-input:focus {
+input:focus,
+select:focus {
   border-color: rgba(23, 231, 255, 0.7);
   box-shadow: 0 0 0 4px rgba(23, 231, 255, 0.1);
 }
@@ -1158,6 +1160,19 @@ input:focus {
     rgba(255, 255, 255, 0.04);
 }
 
+.month-day.adjusted {
+  border-color: color-mix(in srgb, var(--cyan) 48%, rgba(255, 255, 255, 0.12));
+}
+
+.month-day.schedule-skipped {
+  opacity: 0.78;
+  border-top-color: var(--gray);
+}
+
+.month-day.cross-training {
+  border-top-color: var(--purple);
+}
+
 .month-day:disabled {
   cursor: default;
 }
@@ -1239,6 +1254,58 @@ input:focus {
   box-shadow: 0 0 12px rgba(255, 209, 92, 0.24);
 }
 
+.schedule-badge,
+.schedule-pill {
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(23, 231, 255, 0.44);
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: var(--cyan);
+  background: rgba(23, 231, 255, 0.1);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.schedule-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+}
+
+.schedule-pill.safe {
+  border-color: rgba(66, 247, 155, 0.44);
+  color: var(--green);
+  background: rgba(66, 247, 155, 0.1);
+}
+
+.schedule-pill.skipped,
+.schedule-badge.skipped {
+  border-color: rgba(142, 155, 176, 0.46);
+  color: #c8d2e1;
+  background: rgba(142, 155, 176, 0.13);
+}
+
+.schedule-pill.moved,
+.schedule-badge.moved,
+.schedule-pill.adjusted {
+  border-color: rgba(23, 231, 255, 0.46);
+  color: var(--cyan);
+  background: rgba(23, 231, 255, 0.11);
+}
+
+.schedule-pill.cross-train,
+.schedule-badge.cross-train {
+  border-color: rgba(143, 92, 255, 0.52);
+  color: #d9ccff;
+  background: rgba(143, 92, 255, 0.16);
+}
+
 .modify-panel {
   display: grid;
   gap: 10px;
@@ -1246,6 +1313,84 @@ input:focus {
   border: 1px solid rgba(255, 209, 92, 0.3);
   border-radius: 18px;
   background: rgba(255, 209, 92, 0.08);
+}
+
+.schedule-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.schedule-adjustment-panel,
+.schedule-move-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(23, 231, 255, 0.28);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(23, 231, 255, 0.12), transparent 64%),
+    rgba(255, 255, 255, 0.045);
+}
+
+.schedule-adjustment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.schedule-adjustment-header strong {
+  display: block;
+  padding-top: 3px;
+  font-size: 14px;
+}
+
+.schedule-undo-button {
+  min-height: 38px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.schedule-action-row button {
+  flex: 1 1 96px;
+}
+
+.schedule-cross-train-select,
+.schedule-move-panel label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.guardrail-result {
+  border: 1px solid rgba(66, 247, 155, 0.42);
+  border-radius: 14px;
+  padding: 10px;
+  color: #cffff0;
+  background: rgba(66, 247, 155, 0.09);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.guardrail-result.caution {
+  border-color: rgba(255, 209, 92, 0.5);
+  color: #ffe7a8;
+  background: rgba(255, 209, 92, 0.1);
+}
+
+.guardrail-result.blocked {
+  border-color: rgba(255, 59, 112, 0.56);
+  color: #ffc7d4;
+  background: rgba(255, 59, 112, 0.1);
 }
 
 .month-agenda,
@@ -2402,6 +2547,10 @@ dd {
 .dashboard-workout-tile.gold,
 .dashboard-workout-tile.race { --tile-tone: var(--gold); }
 .dashboard-workout-tile.gray { --tile-tone: var(--gray); }
+.dashboard-workout-tile.schedule-skipped { opacity: 0.82; }
+.dashboard-workout-tile.schedule-cross-train { --tile-tone: var(--purple); }
+.dashboard-workout-tile.schedule-moved,
+.dashboard-workout-tile.schedule-adjusted { --tile-tone: var(--cyan); }
 
 .dashboard-workout-tile::after {
   content: "";
@@ -2811,6 +2960,15 @@ dd {
 .dashboard-day-row.skipped {
   opacity: 0.76;
 }
+
+.dashboard-day-row.schedule-skipped,
+.dashboard-day-row.adjusted-empty {
+  opacity: 0.78;
+}
+
+.dashboard-day-row.schedule-cross-train { --tone: var(--purple); }
+.dashboard-day-row.schedule-moved,
+.dashboard-day-row.schedule-adjusted { --tone: var(--cyan); }
 
 .dashboard-day-row.today-workout {
   border: 2px solid color-mix(in srgb, var(--tone) 72%, #ffffff 28%);
