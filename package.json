@@ -11,6 +11,7 @@
     "test:handoff": "npx tsx scripts/testStrideSyncHandoff.ts",
     "test:plan": "npx tsx scripts/testPlanData.ts",
     "test:progress": "npx tsx scripts/testWorkoutProgress.ts",
+    "test:schedule-adjustments": "npx tsx scripts/testScheduleAdjustments.ts",
     "export:run-system:sample": "npx tsx scripts/exportRunSystemSample.ts"
   },
   "dependencies": {

@@ -585,3 +585,26 @@ Recommended phase order:
 6. Phase 12I: StrideSync adjusted-plan matching support.
 7. Phase 12J: Cross-app adjusted schedule contract.
 8. Phase 12K: Cloud/shared persistence design only if local behavior proves stable.
+
+## Phase 12D Implementation Notes
+
+Phase 12D adds the local schedule adjustment foundation only. It introduces `src/lib/scheduleAdjustments.ts` with:
+
+- profile/plan-scoped schedule adjustment types
+- the storage key pattern `half_ass_schedule_adjustments_v1:<planId>`
+- local read/write/add/undo/clear helpers
+- active-adjustment filtering
+- pure adjusted-date schedule resolution helpers
+- workout intensity classification
+- initial guardrail evaluation
+- missed-workout recommendation helpers
+
+The base plan remains immutable. Schedule changes are represented as an overlay that can mark an assigned workout as skipped, moved, swapped, cross-training, missed, repeat-week, or restored/undone without rewriting `src/data/trainingPlan.ts`.
+
+Phase 12D intentionally does not add the full user-facing Skip/Move/Swap UI, does not wire adjusted schedule resolution into Calendar/Dashboard, does not change progress/completion behavior, does not alter StrideSync handoff auto-accept, and does not add Firebase or Firestore reads/writes. StrideSync integration remains Phase 12H and later.
+
+Verification added:
+
+```bash
+npm run test:schedule-adjustments
+```

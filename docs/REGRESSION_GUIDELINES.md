@@ -9,6 +9,7 @@
 - Calendar/plan views must stay readable and card-based on mobile.
 - Workout detail sheet must keep status, notes, flags, target HR, target pace, zones, segments, and Garmin helpers.
 - Progress must use `localStorage`; do not replace it with fake state.
+- Schedule adjustments must remain a local overlay using `half_ass_schedule_adjustments_v1:<planId>`; do not mutate the base plan data to skip, move, swap, repeat, or cross-train workouts.
 - Modified and completed workout states must stay separate: opening Modify alone must not write progress, no-op modified records must be ignored, and calendar green dots/counters must mean completed only.
 - Settings must preserve Week 1 start, race-date alignment, theme, import/export, and reset workflows.
 - Do not add backend/cloud sync or direct StrideSync writes without explicit approval.
@@ -66,10 +67,21 @@ When changing progress, review:
 
 - `src/hooks/useProgress.ts`
 - `src/lib/workoutProgress.ts`
+- `src/lib/scheduleAdjustments.ts` when schedule overlays can affect displayed or matched workout dates
 - `src/pages/Dashboard.tsx`
 - `src/pages/Progress.tsx`
 - `src/components/WorkoutDetailSheet.tsx`
 - Settings import/export behavior
+
+When changing schedule adjustments, review:
+
+- `src/lib/scheduleAdjustments.ts`
+- `scripts/testScheduleAdjustments.ts`
+- `src/utils/workouts.ts`
+- `src/pages/Calendar.tsx`
+- `src/pages/Dashboard.tsx`
+- `src/components/WorkoutDetailSheet.tsx`
+- `docs/MISSED_WORKOUT_REARRANGE_PLAN.md`
 
 When changing settings/date alignment, review:
 
