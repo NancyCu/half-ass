@@ -1491,6 +1491,21 @@ select:focus {
   font-size: 13px;
 }
 
+.schedule-handoff-callout {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(84, 193, 255, 0.28);
+  border-radius: 14px;
+  background: rgba(84, 193, 255, 0.08);
+}
+
+.schedule-handoff-button {
+  width: fit-content;
+  min-height: 38px;
+  padding-inline: 14px;
+}
+
 .schedule-safer-option-list {
   display: flex;
   flex-wrap: wrap;

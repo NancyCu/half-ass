@@ -14,6 +14,8 @@
 - Occupied-date moves must never create two workouts on one date; they should offer a guarded swap path instead, and undoing one side of an active swap must restore both sides safely.
 - Schedule guidance polish must stay compact and mobile-friendly: Smart recommendation copy, reason-based guidance, blocked/caution/safe messaging, and safer-date suggestions belong in the workout detail flow and must not become a wall of text.
 - Missed-day coaching may recommend repeating the current or previous week, but repeat-week remains guidance-only until a later explicit UI phase.
+- Phase 12J schedule-adjustment handoff stays sender-only in Half_Ass: generating a StrideSync URL is allowed, but no StrideSync receiver/runtime code, no cloud schedule sync, and no automatic apply flow should be added here.
+- Any schedule handoff params must stay compact, versioned, and local-only. Keep `scheduleAdjustmentVersion=1`, preserve the StrideSync Training-tab target, and require future receiver confirmation instead of silently syncing.
 - Modified and completed workout states must stay separate: opening Modify alone must not write progress, no-op modified records must be ignored, and calendar green dots/counters must mean completed only.
 - Settings must preserve Week 1 start, race-date alignment, theme, import/export, and reset workflows.
 - Do not add backend/cloud sync, Firebase / Firestore schedule persistence, or direct StrideSync writes without explicit approval.
@@ -80,8 +82,10 @@ When changing progress, review:
 When changing schedule adjustments, review:
 
 - `src/lib/scheduleAdjustments.ts`
+- `src/lib/strideSyncScheduleHandoff.ts`
 - `src/App.tsx`
 - `scripts/testScheduleAdjustments.ts`
+- `scripts/testStrideSyncScheduleHandoff.ts`
 - `src/utils/workouts.ts`
 - `src/pages/Calendar.tsx`
 - `src/pages/Dashboard.tsx`

@@ -4,6 +4,30 @@ This is a design-only plan for missed workouts, schedule rearrangement, safe ski
 
 No runtime code is implemented in this phase. No Firebase, Firestore, Strava sync, RunActivity persistence, Half_Ass auto-accept behavior, StrideSync cloud sync behavior, or planned-vs-actual scoring behavior should change in Phase 12C.
 
+## Phase 12J Schedule Adjustment Handoff Sender
+
+Phase 12J adds a sender-side StrideSync bridge inside Half_Ass only. After a local skip, move, swap, cross-training substitution, missed-state decision, or restore action exists on a workout, Half_Ass can generate a StrideSync URL handoff that opens the StrideSync Training tab with schedule-adjustment metadata in the query string.
+
+What Phase 12J adds:
+
+- A compact "Send to StrideSync" action inside the Half_Ass workout detail sheet when an active schedule adjustment exists.
+- A sender-side URL contract with:
+  - `source=halfass`
+  - `action=applyScheduleAdjustment`
+  - `scheduleAdjustmentVersion=1`
+  - stable workout / date / action metadata
+  - deterministic `scheduleHandoffId` for future receiver dedupe
+- Swap-aware metadata using `swapGroupId`, with optional paired-workout fields when they fit cleanly.
+- Local-only docs and tests for the sender contract.
+
+Important limits for Phase 12J:
+
+- This is still a local-only bridge. There is no Firestore, Firebase, or cloud schedule sync added here.
+- The schedule adjustment source of truth remains `half_ass_schedule_adjustments_v1:<planId>`.
+- Half_Ass still does not apply StrideSync schedule adjustments automatically, and StrideSync still does not receive/apply this sender contract yet.
+- User confirmation is still expected in the future receiver flow.
+- Phase 12K will own the StrideSync receiver and confirmation/apply behavior.
+
 ## Phase 12I Guidance Polish
 
 Phase 12I is a UX and copy polish pass on the local Half_Ass schedule-adjustment feature that shipped in earlier phases. It does not add new architecture, cloud sync, Firestore, or repeat-week automation.

@@ -1,4 +1,5 @@
 import { Activity, BarChart3, CalendarRange, Dumbbell, Gauge, HeartPulse } from 'lucide-react'
+import { getStrideSyncBaseUrl } from '../lib/strideSyncScheduleHandoff'
 
 export type Screen = 'dashboard' | 'calendar' | 'zones' | 'library' | 'progress' | 'settings'
 
@@ -10,7 +11,7 @@ const items = [
   { id: 'progress', label: 'Progress', icon: BarChart3 },
 ] satisfies { id: Screen; label: string; icon: typeof Activity }[]
 
-const stridesyncUrl = import.meta.env.VITE_STRIDESYNC_URL || 'http://localhost:5173/?trainingTab=1'
+const stridesyncUrl = getStrideSyncBaseUrl()
 
 export function BottomNav({ active, onChange }: { active: Screen; onChange: (screen: Screen) => void }) {
   function openStrideSync() {

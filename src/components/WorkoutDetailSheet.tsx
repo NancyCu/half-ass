@@ -6,6 +6,7 @@ import type { PainFlag, WorkoutStatus } from '../hooks/useProgress'
 import {
   evaluateScheduleAdjustment,
   evaluateScheduleSwap,
+  getActiveScheduleAdjustments,
   getSmartScheduleRecommendation,
   getSwapTargetWorkout,
   resolveAdjustedWorkoutForDate,
@@ -15,6 +16,7 @@ import {
   type ScheduleAdjustmentState,
   type ScheduleGuardrailResult,
 } from '../lib/scheduleAdjustments'
+import { buildStrideSyncScheduleHandoffUrl } from '../lib/strideSyncScheduleHandoff'
 import { toISODate } from '../utils/dates'
 import { getWorkoutSegments, workoutISO } from '../utils/workouts'
 import { GarminCopyButton } from './GarminCopyButton'
@@ -203,6 +205,38 @@ export function WorkoutDetailSheet({
     ? getSwapTargetWorkout(basePlan, moveDate, scheduleAdjustments, week1Start)
     : null
   const swapTargetWorkout = occupiedTargetWorkout && occupiedTargetWorkout.id !== activeWorkout.id ? occupiedTargetWorkout : null
+  const pairedSwapAdjustment = activeAdjustment?.action === 'swapped' && activeAdjustment.swapGroupId
+    ? getActiveScheduleAdjustments(scheduleAdjustments).find((entry) => (
+      entry.swapGroupId === activeAdjustment.swapGroupId
+      && entry.workoutId !== activeAdjustment.workoutId
+    )) ?? null
+    : null
+  const pairedWorkout = pairedSwapAdjustment
+    ? basePlan.flatMap((week) => week.days).find((entry) => entry.id === pairedSwapAdjustment.workoutId) ?? null
+    : null
+  const scheduleHandoff = activeAdjustment
+    ? buildStrideSyncScheduleHandoffUrl({
+      actionType: activeAdjustment.action === 'repeat_week' ? 'moved' : activeAdjustment.action,
+      adjustmentId: activeAdjustment.id,
+      assignedDate: activeAdjustment.assignedDate,
+      createdAt: activeAdjustment.createdAt,
+      planId: activeAdjustment.planId,
+      profileId: activeAdjustment.profileId,
+      originalDate: activeAdjustment.originalDate,
+      reason: activeAdjustment.reason,
+      updatedAt: activeAdjustment.updatedAt,
+      workoutId: activeAdjustment.workoutId,
+      workoutName: activeWorkout.name,
+      crossTrainingType: activeAdjustment.crossTrainingType,
+      guardrailSeverity: activeAdjustment.guardrailWarnings.length > 0 ? 'caution' : 'safe',
+      guardrailWarnings: activeAdjustment.guardrailWarnings,
+      pairedAssignedDate: pairedSwapAdjustment?.assignedDate,
+      pairedOriginalDate: pairedSwapAdjustment?.originalDate,
+      pairedWorkoutId: pairedSwapAdjustment?.workoutId,
+      pairedWorkoutName: pairedWorkout?.name,
+      swapGroupId: activeAdjustment.swapGroupId,
+    })
+    : null
 
   function makeAdjustment(action: ScheduleAdjustment['action'], nextAssignedDate = assignedDate, extra: Partial<ScheduleAdjustment> = {}): ScheduleAdjustment {
     const now = new Date().toISOString()
@@ -336,6 +370,11 @@ export function WorkoutDetailSheet({
     onUndoScheduleAdjustment(activeAdjustment.id, activeAdjustment.originalDate, activeAdjustment.workoutId)
   }
 
+  function openStrideSyncScheduleHandoff() {
+    if (!scheduleHandoff) return
+    window.location.assign(scheduleHandoff.url)
+  }
+
   const activeSegmentIndex = selectedSegment ?? introIndex
   const activeSegment = activeSegmentIndex === null ? null : segments[activeSegmentIndex]
   const displayedTargetBpm = activeSegment?.targetBpm ?? workout.targetBpm
@@ -451,6 +490,16 @@ export function WorkoutDetailSheet({
           <p className="schedule-helper-copy">
             Use cross-training for soreness or minor injury. Keep the same duration and zones when possible. Bike or elliptical work best. Cross-training does not automatically complete the workout.
           </p>
+          {scheduleHandoff ? (
+            <section className="schedule-handoff-callout" aria-label="StrideSync schedule handoff">
+              <p className="schedule-helper-copy">
+                Schedule changes are local. Send this adjustment to StrideSync if you want matching to follow it there too.
+              </p>
+              <button className="secondary-button schedule-handoff-button" type="button" onClick={openStrideSyncScheduleHandoff}>
+                Send to StrideSync
+              </button>
+            </section>
+          ) : null}
           {isMoveOpen ? (
             <div className="schedule-move-panel">
               <label>
