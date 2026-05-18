@@ -12,6 +12,7 @@ import {
   getAdjustedWeekSchedule,
   getMissedWorkoutRecommendation,
   getScheduleAdjustmentStorageKey,
+  getSmartScheduleRecommendation,
   getSwapTargetWorkout,
   readScheduleAdjustments,
   resolveAdjustedWorkoutForDate,
@@ -210,7 +211,11 @@ const intervalNextToFastFinish = adjustment({
 const intervalResult = evaluateScheduleAdjustment(guardrailPlan, intervalNextToFastFinish, [], week1Start)
 assert.equal(intervalResult.allowed, false)
 assert.equal(intervalResult.severity, 'blocked')
-assert.match(intervalResult.warnings.join(' '), /hard workouts back-to-back/i)
+assert.match(intervalResult.warnings.join(' '), /Blocked: this would put two hard workouts back-to-back/i)
+assert.ok(intervalResult.saferDateSuggestions && intervalResult.saferDateSuggestions.length > 0)
+assert.ok(intervalResult.saferDateSuggestions?.every((suggestion) => suggestion.date !== '2026-05-12'))
+assert.ok(intervalResult.saferDateSuggestions?.every((suggestion) => suggestion.date !== '2026-05-13'))
+assert.equal(intervalResult.saferDateSuggestions?.[0]?.action, 'move')
 
 const fastFinishNextToSpeed = adjustment({
   id: 'move-fast-finish-next-to-speed',
@@ -243,7 +248,8 @@ const sameDayMove = adjustment({
 })
 const sameDayResult = evaluateScheduleAdjustment(profile.trainingPlan, sameDayMove, [], week1Start)
 assert.equal(sameDayResult.allowed, false)
-assert.match(sameDayResult.warnings.join(' '), /swap workouts instead/i)
+assert.match(sameDayResult.warnings.join(' '), /Blocked: this would cram multiple workouts into one day/i)
+assert.ok(sameDayResult.saferDateSuggestions?.every((suggestion) => suggestion.date !== '2026-05-11'))
 
 const safeSwapResult = evaluateScheduleSwap(profile.trainingPlan, swapMonday, swapWednesday, [], week1Start)
 assert.equal(safeSwapResult.allowed, true)
@@ -303,12 +309,35 @@ const sorenessMove = adjustment({
 const sorenessResult = evaluateScheduleAdjustment(profile.trainingPlan, sorenessMove, [], week1Start)
 assert.equal(sorenessResult.allowed, true)
 assert.equal(sorenessResult.severity, 'caution')
-assert.match(sorenessResult.recommendation, /cross-training or rest/i)
+assert.match(sorenessResult.warnings.join(' '), /cross-training or rest/i)
+assert.match(sorenessResult.recommendation, /legs feel normal/i)
 
-assert.match(getMissedWorkoutRecommendation(1).recommendation, /Skip the missed workout and continue from today/i)
+assert.match(getMissedWorkoutRecommendation(1).recommendation, /Missed 1-3 days: skip and continue today/i)
 assert.match(getMissedWorkoutRecommendation(3).warnings.join(' '), /Do not cram/i)
-assert.match(getMissedWorkoutRecommendation(7).recommendation, /Repeat the previous or current week/i)
-assert.match(getMissedWorkoutRecommendation(2, 'minor ankle injury').recommendation, /cross-training/i)
+assert.match(getMissedWorkoutRecommendation(5).recommendation, /Missed 4-6 days: reduce volume or repeat the current week/i)
+assert.match(getMissedWorkoutRecommendation(7).recommendation, /Missed 7\+ days: repeating the previous or current week/i)
+assert.match(getMissedWorkoutRecommendation(2, 'minor ankle injury').recommendation, /Sore or minor injury/i)
+
+const soreGuidance = getSmartScheduleRecommendation(profile.trainingPlan, mondayFoundation, '2026-05-11', [], {
+  todayISO: '2026-05-13',
+  reason: 'Sore / minor injury',
+  week1StartISO: week1Start,
+})
+assert.match(soreGuidance.summary, /cross-training or rest is safer/i)
+assert.match(soreGuidance.recommendation, /Keep the same duration and zones/i)
+
+const oneDayGuidance = getSmartScheduleRecommendation(profile.trainingPlan, mondayFoundation, '2026-05-11', [], {
+  todayISO: '2026-05-12',
+  week1StartISO: week1Start,
+})
+assert.match(oneDayGuidance.summary, /skip and continue today/i)
+
+const weekMissedGuidance = getSmartScheduleRecommendation(profile.trainingPlan, mondayFoundation, '2026-05-11', [], {
+  todayISO: '2026-05-19',
+  week1StartISO: week1Start,
+})
+assert.match(weekMissedGuidance.summary, /Missed 7\+ days/i)
+assert.match(weekMissedGuidance.warnings.join(' '), /guidance only/i)
 
 const adjustedWeek = getAdjustedWeekSchedule(profile.trainingPlan, '2026-08-25', 2, [moved], week1Start)
 assert.equal(adjustedWeek[0].workout?.id, mondayFoundation.id)

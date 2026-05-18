@@ -4,6 +4,30 @@ This is a design-only plan for missed workouts, schedule rearrangement, safe ski
 
 No runtime code is implemented in this phase. No Firebase, Firestore, Strava sync, RunActivity persistence, Half_Ass auto-accept behavior, StrideSync cloud sync behavior, or planned-vs-actual scoring behavior should change in Phase 12C.
 
+## Phase 12I Guidance Polish
+
+Phase 12I is a UX and copy polish pass on the local Half_Ass schedule-adjustment feature that shipped in earlier phases. It does not add new architecture, cloud sync, Firestore, or repeat-week automation.
+
+What Phase 12I adds:
+
+- A compact Smart recommendation panel in the workout detail flow.
+- Reason-based guidance for busy days, travel, weather, tired / poor sleep, and sore / minor injury.
+- Clearer blocked, caution, and safe copy for move and swap decisions.
+- Safer nearby date suggestions when a move or swap is blocked, with preference toward open, rest, or easier days.
+- Better missed-day coaching:
+  - 1-3 missed days: skip and continue today is usually best.
+  - 4-6 missed days: reduce volume or consider repeating the current week.
+  - 7+ missed days: repeat the previous or current week instead of cramming.
+- Better cross-training guidance for soreness or minor injury.
+
+Important limits for Phase 12I:
+
+- Repeat week remains guidance-only for now; there is still no automated repeat-week UI in this phase.
+- Base plan data in `src/data/trainingPlan.ts` remains immutable.
+- Schedule adjustments remain local-only in `half_ass_schedule_adjustments_v1:<planId>`.
+- No StrideSync runtime behavior is modified in this phase.
+- No Firebase / Firestore reads or writes are added in this phase.
+
 ## Doc Location Decision
 
 This plan lives in `Half_Ass_Training/docs/` because the feature is mostly a schedule-editing and user-workflow feature. Half_Ass should own the adjusted training schedule first, because it is the standalone plan reference app, already owns the workout detail sheet, calendar, local progress, manual skip/modify actions, automation history, and profile-separated plan state. StrideSync should consume the adjusted schedule later so planned-vs-actual matching targets the workout assigned to the selected date.

@@ -1,5 +1,5 @@
 import type { WeekPlan, Workout } from '../data/trainingPlan'
-import { addDays, parseISODate, toISODate } from '../utils/dates'
+import { addDays, daysBetween, formatFriendlyDate, parseISODate, toISODate } from '../utils/dates'
 import { workoutDate } from '../utils/workouts'
 
 export const SCHEDULE_ADJUSTMENT_STORAGE_PREFIX = 'half_ass_schedule_adjustments_v1'
@@ -64,12 +64,30 @@ export type ScheduleGuardrailResult = {
   severity: ScheduleGuardrailSeverity
   warnings: string[]
   recommendation: string
+  saferDateSuggestions?: SaferDateSuggestion[]
 }
 
 export type MissedWorkoutRecommendation = {
   severity: ScheduleGuardrailSeverity
   recommendation: string
   warnings: string[]
+}
+
+export type SaferDateSuggestion = {
+  date: string
+  label: string
+  reason: string
+  action: 'move' | 'swap'
+  severity: Exclude<ScheduleGuardrailSeverity, 'blocked'>
+}
+
+export type SmartScheduleRecommendation = {
+  severity: ScheduleGuardrailSeverity
+  title: string
+  summary: string
+  recommendation: string
+  warnings: string[]
+  missedDays: number
 }
 
 type ScheduleAdjustmentStorage = {
@@ -226,6 +244,33 @@ function cloneCrossTrainingWorkout(workout: Workout, adjustment: ScheduleAdjustm
     ...workout,
     notes: `Cross-training substitute${adjustment.crossTrainingType ? ` (${adjustment.crossTrainingType.replace('_', ' ')})` : ''}. ${workout.notes}`,
   }
+}
+
+function formatSuggestionLabel(isoDate: string): string {
+  return formatFriendlyDate(parseISODate(isoDate))
+}
+
+function recommendationForSafeAdjustment(plan: WeekPlan[], candidateAdjustments: ScheduleAdjustment[]): string {
+  if (candidateAdjustments.every((adjustment) => adjustment.action === 'cross_train')) {
+    return 'Safe: cross-training keeps the workout structure without forcing impact.'
+  }
+
+  const primaryWorkout = getWorkoutById(plan, candidateAdjustments[0]?.workoutId ?? '')
+  const primaryIntensity = classifyWorkoutIntensity(primaryWorkout)
+  const hasSwap = candidateAdjustments.some((adjustment) => adjustment.action === 'swapped')
+  if (hasSwap) return 'Safe: this keeps hard/easy spacing intact.'
+  if (primaryIntensity === 'easy' || primaryIntensity === 'rest') return 'Safe: easy workout move looks okay.'
+  return 'Safe: this keeps hard/easy spacing intact.'
+}
+
+function recommendationForCaution(warnings: string[]): string {
+  if (warnings.some((warning) => /sore|injury|cross-training or rest/i.test(warning))) {
+    return 'Caution: do this only if your legs feel normal. Otherwise rest or cross-train.'
+  }
+  if (warnings.some((warning) => /hard\/easy rhythm/i.test(warning))) {
+    return 'Caution: move is possible, but keep the next run easy.'
+  }
+  return 'Caution: do this only if your legs feel normal.'
 }
 
 export function getScheduleAdjustmentStorageKey(planId: string): string {
@@ -432,7 +477,7 @@ function evaluateScheduleAdjustmentsBatch(
   const assignmentCounts = countAssignmentsByDate(nextAdjustments)
   const duplicateDate = [...assignmentCounts.entries()].find(([, count]) => count > 1)?.[0]
   if (duplicateDate) {
-    return result(false, ['Do not cram multiple workouts into the same day.'], 'Swap workouts or choose an open day instead of doubling up.')
+    return result(false, ['Blocked: this would cram multiple workouts into one day.'], 'Try a rest or open day instead, or use swap if that date already has a run.')
   }
 
   const affectedDates = unique(candidateAdjustments.flatMap((adjustment) => [adjustment.originalDate, adjustment.assignedDate]))
@@ -445,8 +490,7 @@ function evaluateScheduleAdjustmentsBatch(
     const weekSchedule = getAdjustedWeekSchedule(plan, weekStart, 7, nextAdjustments, week1StartISO)
     const qualityCount = weekSchedule.filter((entry) => classifyWorkoutIntensity(entry.workout, entry.adjustment) === 'quality').length
     if (qualityCount > 3) {
-      warnings.push('This week has more hard workouts than the guardrail recommends.')
-      break
+      return result(false, ['Blocked: this would make the week too loaded.'], 'Keep the week simpler instead of trying to catch up all the missed stress.')
     }
   }
 
@@ -463,30 +507,38 @@ function evaluateScheduleAdjustmentsBatch(
     const nextIntensity = classifyWorkoutIntensity(next.workout, next.adjustment)
 
     if (intensity === 'quality' && (previousIntensity === 'quality' || nextIntensity === 'quality')) {
-      return result(false, ['This swap would put two hard workouts back-to-back.'], 'Keep at least one easy, rest, or cross-training day between quality workouts.')
+      return result(false, ['Blocked: this would put two hard workouts back-to-back.'], 'Choose a date with an easy, rest, or cross-training day between hard workouts.')
     }
 
     if (intensity === 'long_run' && (previousIntensity === 'quality' || nextIntensity === 'quality')) {
-      return result(false, ['This places a long run too close to a quality workout.'], 'Keep at least one easier day between long-run and quality stress.')
+      return result(false, ['Blocked: this would put a long run too close to a quality workout.'], 'Choose a date with an easier day between the long run and quality stress.')
     }
   }
 
   const sorenessAdjustment = candidateAdjustments.find((adjustment) => sorenessDescriptors.test(adjustment.reason ?? ''))
   if (sorenessAdjustment && sorenessAdjustment.action !== 'cross_train' && sorenessAdjustment.action !== 'skipped') {
-    warnings.push('Cross-training or rest is recommended when soreness or minor injury is the reason.')
-    return result(true, warnings, 'Prefer cross-training or rest instead of forcing a catch-up run.')
+    warnings.push('Caution: sore or minor injury days are usually better handled with cross-training or rest.')
+    return result(true, warnings, recommendationForCaution(warnings))
   }
 
   if (candidateAdjustments.every((adjustment) => adjustment.action === 'cross_train')) {
-    return result(true, warnings, 'Preserve the same time, structure, and zones with non-impact aerobic work.')
+    return result(true, warnings, recommendationForSafeAdjustment(plan, candidateAdjustments))
   }
 
-  const hasSwap = candidateAdjustments.some((adjustment) => adjustment.action === 'swapped')
+  const rhythmShift = candidateAdjustments.some((adjustment) => {
+    if (adjustment.action !== 'moved' && adjustment.action !== 'swapped') return false
+    if (sameDate(adjustment.originalDate, adjustment.assignedDate)) return false
+    const movedWorkout = getWorkoutById(plan, adjustment.workoutId)
+    const movedIntensity = classifyWorkoutIntensity(movedWorkout)
+    return movedIntensity === 'quality' || movedIntensity === 'long_run'
+  })
+  if (rhythmShift) {
+    warnings.push('Caution: this changes your hard/easy rhythm.')
+  }
+
   const recommendation = warnings.length > 0
-    ? 'Proceed with caution and keep the rest of the week easy.'
-    : hasSwap
-      ? 'Swap keeps the current schedule guardrails intact.'
-      : 'Adjustment passes the current schedule guardrails.'
+    ? recommendationForCaution(warnings)
+    : recommendationForSafeAdjustment(plan, candidateAdjustments)
   return result(true, warnings, recommendation)
 }
 
@@ -507,7 +559,12 @@ export function evaluateScheduleSwap(
   existingAdjustments: ScheduleAdjustment[] | ScheduleAdjustmentState = [],
   week1StartISO = '2026-05-11',
 ): ScheduleGuardrailResult {
-  return evaluateScheduleAdjustmentsBatch(plan, [first, second], existingAdjustments, week1StartISO)
+  const evaluation = evaluateScheduleAdjustmentsBatch(plan, [first, second], existingAdjustments, week1StartISO)
+  if (evaluation.allowed) return evaluation
+  return {
+    ...evaluation,
+    saferDateSuggestions: getSaferDateSuggestions(plan, first, existingAdjustments, week1StartISO),
+  }
 }
 
 export function evaluateScheduleAdjustment(
@@ -525,18 +582,30 @@ export function evaluateScheduleAdjustment(
     && currentAssignedWorkoutId
     && currentAssignedWorkoutId !== workout.id
   ) {
-    return result(false, ['Target date is already occupied. Swap workouts instead of cramming two onto one day.'], 'Use the swap flow or choose an open day.')
+    const blocked = result(false, ['Blocked: this would cram multiple workouts into one day.'], 'Use the swap option or choose an open day instead.')
+    return {
+      ...blocked,
+      saferDateSuggestions: getSaferDateSuggestions(plan, adjustment, active, week1StartISO),
+    }
   }
 
-  return evaluateScheduleAdjustmentsBatch(plan, [adjustment], active, week1StartISO)
+  const evaluation = evaluateScheduleAdjustmentsBatch(plan, [adjustment], active, week1StartISO)
+  if (evaluation.allowed) return evaluation
+  return {
+    ...evaluation,
+    saferDateSuggestions: getSaferDateSuggestions(plan, adjustment, active, week1StartISO),
+  }
 }
 
 export function getMissedWorkoutRecommendation(missedDays: number, reason?: string): MissedWorkoutRecommendation {
   if (sorenessDescriptors.test(reason ?? '')) {
     return {
       severity: 'caution',
-      recommendation: 'Choose rest or a low-impact cross-training substitute instead of forcing a catch-up run.',
-      warnings: ['Cross-training is recommended if soreness or minor injury is the reason.'],
+      recommendation: 'Sore or minor injury: choose rest or low-impact cross-training instead of forcing a catch-up run.',
+      warnings: [
+        'Use this for soreness or minor injury.',
+        'Bike or elliptical are usually the best non-impact aerobic replacement.',
+      ],
     }
   }
 
@@ -551,7 +620,7 @@ export function getMissedWorkoutRecommendation(missedDays: number, reason?: stri
   if (missedDays <= 3) {
     return {
       severity: 'safe',
-      recommendation: 'Skip the missed workout and continue from today unless a single easy move is clearly safe.',
+      recommendation: 'Missed 1-3 days: skip and continue today unless one easy move is clearly safe.',
       warnings: ['Do not cram missed volume into a tight window.'],
     }
   }
@@ -559,14 +628,173 @@ export function getMissedWorkoutRecommendation(missedDays: number, reason?: stri
   if (missedDays <= 6) {
     return {
       severity: 'caution',
-      recommendation: 'Review the week and consider reducing volume or repeating the current week.',
+      recommendation: 'Missed 4-6 days: reduce volume or repeat the current week instead of trying to catch up everything.',
       warnings: ['Avoid stacking missed workouts just to hit the planned weekly volume.'],
     }
   }
 
   return {
     severity: 'caution',
-    recommendation: 'Repeat the previous or current week safely instead of cramming missed workouts.',
+    recommendation: 'Missed 7+ days: repeating the previous or current week is safer than cramming missed workouts.',
     warnings: ['A full week or more was missed, so restarting the rhythm is safer than catching up.'],
+  }
+}
+
+export function getSaferDateSuggestions(
+  plan: WeekPlan[],
+  adjustment: ScheduleAdjustment,
+  existingAdjustments: ScheduleAdjustment[] | ScheduleAdjustmentState = [],
+  week1StartISO = '2026-05-11',
+  limit = 3,
+): SaferDateSuggestion[] {
+  const active = getActiveScheduleAdjustments(existingAdjustments).filter((entry) => entry.id !== adjustment.id)
+  const workout = getWorkoutById(plan, adjustment.workoutId)
+  if (!workout) return []
+
+  const center = parseISODate(adjustment.assignedDate)
+  const offsets = [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7]
+  const suggestions: Array<SaferDateSuggestion & { rank: number }> = []
+
+  for (const offset of offsets) {
+    const candidateDate = toISODate(addDays(center, offset))
+    if (candidateDate === adjustment.assignedDate || candidateDate === adjustment.originalDate) continue
+    if (suggestions.some((entry) => entry.date === candidateDate)) continue
+
+    const targetWorkout = getSwapTargetWorkout(plan, candidateDate, active, week1StartISO)
+    if (targetWorkout && targetWorkout.id === workout.id) continue
+
+    if (targetWorkout) {
+      const targetResolved = resolveAdjustedWorkoutForDate(plan, candidateDate, active, week1StartISO)
+      const swapGroupId = `suggested-swap-${adjustment.workoutId}-${candidateDate}`
+      const selectedSwap = {
+        ...adjustment,
+        assignedDate: candidateDate,
+        action: 'swapped' as const,
+        swapGroupId,
+        swapWithWorkoutId: targetWorkout.id,
+      }
+      const targetSwap: ScheduleAdjustment = {
+        id: `${swapGroupId}-${targetWorkout.id}`,
+        planId: adjustment.planId,
+        profileId: adjustment.profileId,
+        workoutId: targetWorkout.id,
+        originalDate: targetResolved.originalDate ?? candidateDate,
+        assignedDate: adjustment.originalDate,
+        action: 'swapped',
+        status: 'active',
+        reason: adjustment.reason,
+        createdAt: adjustment.createdAt,
+        updatedAt: adjustment.updatedAt,
+        source: 'system',
+        guardrailWarnings: [],
+        swapWithWorkoutId: workout.id,
+        swapGroupId,
+      }
+      const swapEvaluation = evaluateScheduleAdjustmentsBatch(plan, [selectedSwap, targetSwap], active, week1StartISO)
+      if (!swapEvaluation.allowed) continue
+      const targetIntensity = classifyWorkoutIntensity(targetWorkout)
+      const rank = targetIntensity === 'easy' ? (swapEvaluation.severity === 'safe' ? 1 : 3) : 5
+      suggestions.push({
+        date: candidateDate,
+        label: formatSuggestionLabel(candidateDate),
+        reason: targetIntensity === 'easy' ? 'Easy day swap looks safer here.' : 'This swap passes the current guardrails.',
+        action: 'swap',
+        severity: swapEvaluation.severity as Exclude<ScheduleGuardrailSeverity, 'blocked'>,
+        rank,
+      })
+      continue
+    }
+
+    const movedCandidate = {
+      ...adjustment,
+      assignedDate: candidateDate,
+      action: 'moved' as const,
+    }
+    const moveEvaluation = evaluateScheduleAdjustmentsBatch(plan, [movedCandidate], active, week1StartISO)
+    if (!moveEvaluation.allowed) continue
+    suggestions.push({
+      date: candidateDate,
+      label: formatSuggestionLabel(candidateDate),
+      reason: 'Open or rest day keeps the week cleaner.',
+      action: 'move',
+      severity: moveEvaluation.severity as Exclude<ScheduleGuardrailSeverity, 'blocked'>,
+      rank: moveEvaluation.severity === 'safe' ? 0 : 2,
+    })
+  }
+
+  return suggestions
+    .sort((left, right) => left.rank - right.rank || left.date.localeCompare(right.date))
+    .slice(0, limit)
+    .map((suggestion) => ({
+      date: suggestion.date,
+      label: suggestion.label,
+      reason: suggestion.reason,
+      action: suggestion.action,
+      severity: suggestion.severity,
+    }))
+}
+
+export function getSmartScheduleRecommendation(
+  _plan: WeekPlan[],
+  workout: Workout,
+  selectedDate: string,
+  existingAdjustments: ScheduleAdjustment[] | ScheduleAdjustmentState = [],
+  options: {
+    todayISO?: string
+    reason?: string
+    week1StartISO?: string
+  } = {},
+): SmartScheduleRecommendation {
+  const todayISO = options.todayISO ?? toISODate(new Date())
+  const missedDays = Math.max(daysBetween(parseISODate(selectedDate), parseISODate(todayISO)), 0)
+  const baseMissedRecommendation = getMissedWorkoutRecommendation(missedDays, options.reason)
+  const intensity = classifyWorkoutIntensity(workout)
+  const activeCount = getActiveScheduleAdjustments(existingAdjustments).length
+  const warnings = [...baseMissedRecommendation.warnings]
+
+  if (activeCount > 0) {
+    warnings.push(`You already have ${activeCount} active schedule adjustment${activeCount === 1 ? '' : 's'}, so keep this week simple.`)
+  }
+
+  if (intensity === 'quality' && missedDays > 0 && missedDays <= 3 && !sorenessDescriptors.test(options.reason ?? '')) {
+    return {
+      severity: 'safe',
+      title: 'Smart recommendation',
+      summary: `Missed ${missedDays} day${missedDays === 1 ? '' : 's'}: safest move is usually skip and continue today.`,
+      recommendation: 'Quality workouts are usually not worth cramming back into the week.',
+      warnings,
+      missedDays,
+    }
+  }
+
+  if (intensity === 'easy' && missedDays > 0 && missedDays <= 3 && !sorenessDescriptors.test(options.reason ?? '')) {
+    warnings.push('If you move anything, move only one easy run and keep the rest of the week normal.')
+  }
+
+  if (sorenessDescriptors.test(options.reason ?? '')) {
+    warnings.push('Cross-training does not auto-complete the workout.')
+    return {
+      severity: 'caution',
+      title: 'Smart recommendation',
+      summary: 'Sore or minor injury: cross-training or rest is safer than forcing the run.',
+      recommendation: 'Keep the same duration and zones when possible. Bike or elliptical usually work best.',
+      warnings,
+      missedDays,
+    }
+  }
+
+  if (missedDays >= 7) {
+    warnings.push('Repeat week is guidance only for now, not an automated schedule action.')
+  }
+
+  return {
+    severity: baseMissedRecommendation.severity,
+    title: 'Smart recommendation',
+    summary: baseMissedRecommendation.recommendation,
+    recommendation: intensity === 'easy' && missedDays <= 3
+      ? 'Easy runs are the only ones worth moving, and only when the target date still looks safe.'
+      : baseMissedRecommendation.recommendation,
+    warnings,
+    missedDays,
   }
 }

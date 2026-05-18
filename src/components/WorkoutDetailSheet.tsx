@@ -6,6 +6,7 @@ import type { PainFlag, WorkoutStatus } from '../hooks/useProgress'
 import {
   evaluateScheduleAdjustment,
   evaluateScheduleSwap,
+  getSmartScheduleRecommendation,
   getSwapTargetWorkout,
   resolveAdjustedWorkoutForDate,
   type CrossTrainingType,
@@ -35,6 +36,16 @@ const crossTrainingOptions: Array<{ value: CrossTrainingType; label: string }> =
   { value: 'other', label: 'Other' },
 ]
 
+const scheduleAdjustmentReasons = [
+  { value: '', label: 'No reason selected' },
+  { value: 'Busy / life happened', label: 'Busy / life happened' },
+  { value: 'Sore / minor injury', label: 'Sore / minor injury' },
+  { value: 'Weather', label: 'Weather' },
+  { value: 'Travel', label: 'Travel' },
+  { value: 'Tired / poor sleep', label: 'Tired / poor sleep' },
+  { value: 'Other', label: 'Other' },
+] as const
+
 function createAdjustmentId(action: string, workoutId: string) {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
   return `${action}-${workoutId}-${Date.now()}`
@@ -44,7 +55,7 @@ function todayISO() {
   return toISODate(new Date())
 }
 
-function guardrailLabel(result: ScheduleGuardrailResult) {
+function guardrailLabel(result: { severity: ScheduleGuardrailResult['severity'] }) {
   if (result.severity === 'blocked') return 'Blocked'
   if (result.severity === 'caution') return 'Caution'
   return 'Safe'
@@ -102,6 +113,7 @@ export function WorkoutDetailSheet({
   const [moveResult, setMoveResult] = useState<ScheduleGuardrailResult | null>(null)
   const [crossTrainingType, setCrossTrainingType] = useState<CrossTrainingType>('cycling')
   const [selectedSegment, setSelectedSegment] = useState<number | null>(null)
+  const [selectedReason, setSelectedReason] = useState<string>('')
 
   const segments = useMemo(() => (workout ? getWorkoutSegments(workout, zoneTargets, zones) : []), [workout, zoneTargets, zones])
 
@@ -147,8 +159,28 @@ export function WorkoutDetailSheet({
       setModificationDraft(modificationSummary ?? '')
       setIsMoveOpen(false)
       setMoveResult(null)
+      setSelectedReason('')
     })
   }, [modificationSummary, workout?.id])
+
+  const smartRecommendation = useMemo(() => {
+    if (!workout) {
+      return {
+        severity: 'safe' as const,
+        title: 'Smart recommendation',
+        summary: 'Stay on the current plan.',
+        recommendation: 'Stay on the current plan.',
+        warnings: [],
+        missedDays: 0,
+      }
+    }
+
+    return getSmartScheduleRecommendation(basePlan, workout, selectedResolvedWorkout?.assignedDate ?? workoutISO(workout, week1Start), scheduleAdjustments, {
+      todayISO: todayISO(),
+      reason: selectedReason,
+      week1StartISO: week1Start,
+    })
+  }, [basePlan, scheduleAdjustments, selectedReason, selectedResolvedWorkout?.assignedDate, week1Start, workout])
 
   if (!workout) return null
 
@@ -187,13 +219,17 @@ export function WorkoutDetailSheet({
       updatedAt: now,
       source: 'user',
       guardrailWarnings: [],
+      reason: selectedReason || undefined,
       ...extra,
     }
   }
 
   function saveSkip() {
-    if (!window.confirm('Skip this workout? This will not count as completed.')) return
-    onSaveScheduleAdjustments([makeAdjustment('skipped', assignedDate, { reason: 'User skipped workout' })])
+    const message = smartRecommendation.missedDays > 0
+      ? `${smartRecommendation.summary}\n\nSkip this workout and continue from today? This will not count as completed.`
+      : 'Skip this workout? This will not count as completed.'
+    if (!window.confirm(message)) return
+    onSaveScheduleAdjustments([makeAdjustment('skipped', assignedDate, { reason: selectedReason || 'User skipped workout' })])
   }
 
   function previewMove(nextDate: string) {
@@ -227,7 +263,7 @@ export function WorkoutDetailSheet({
         guardrailWarnings: [],
         swapWithWorkoutId: activeWorkout.id,
         swapGroupId,
-        reason: 'User swapped workouts',
+        reason: selectedReason || 'User swapped workouts',
       }
       setMoveResult(evaluateScheduleSwap(basePlan, selectedSwap, targetSwap, scheduleAdjustments, week1Start))
       return
@@ -246,7 +282,7 @@ export function WorkoutDetailSheet({
         createdAt: now,
         updatedAt: now,
         guardrailWarnings: moveResult.warnings,
-        reason: 'User swapped workouts',
+        reason: selectedReason || 'User swapped workouts',
         swapGroupId,
         swapWithWorkoutId: swapTargetWorkout.id,
       })
@@ -263,31 +299,31 @@ export function WorkoutDetailSheet({
         updatedAt: now,
         source: 'user',
         guardrailWarnings: moveResult.warnings,
-        reason: 'User swapped workouts',
+        reason: selectedReason || 'User swapped workouts',
         swapWithWorkoutId: activeWorkout.id,
         swapGroupId,
       }
       const message = moveResult.severity === 'caution'
-        ? `${moveResult.warnings.join('\n')}\n\nSwap anyway?`
-        : `Swap this workout with ${swapTargetWorkout.name} on ${moveDate}?`
+        ? `${moveResult.recommendation}\n\n${moveResult.warnings.join('\n')}\n\nSwap anyway with ${swapTargetWorkout.name} on ${moveDate}?`
+        : `${moveResult.recommendation}\n\nSwap this workout with ${swapTargetWorkout.name} on ${moveDate}?`
       if (!window.confirm(message)) return
       onSaveScheduleAdjustments([selectedSwap, targetSwap])
       setIsMoveOpen(false)
       return
     }
     const message = moveResult.severity === 'caution'
-      ? `${moveResult.warnings.join('\n')}\n\nMove anyway?`
-      : `Move this workout to ${moveDate}?`
+      ? `${moveResult.recommendation}\n\n${moveResult.warnings.join('\n')}\n\nMove anyway to ${moveDate}?`
+      : `${moveResult.recommendation}\n\nMove this workout to ${moveDate}?`
     if (!window.confirm(message)) return
     onSaveScheduleAdjustments([makeAdjustment('moved', moveDate, { guardrailWarnings: moveResult.warnings })])
     setIsMoveOpen(false)
   }
 
   function saveCrossTraining() {
-    if (!window.confirm('Replace this run with a cross-training substitute? Completion still stays manual.')) return
+    if (!window.confirm('Replace this run with a cross-training substitute? Use this for soreness or minor injury. Completion still stays manual.')) return
     onSaveScheduleAdjustments([makeAdjustment('cross_train', assignedDate, {
       crossTrainingType,
-      reason: 'User selected cross-training substitute',
+      reason: selectedReason || 'User selected cross-training substitute',
     })])
   }
 
@@ -375,12 +411,46 @@ export function WorkoutDetailSheet({
             </button>
             <button type="button" onClick={saveCrossTraining}>Cross-train</button>
           </div>
+          <section className={`schedule-guidance-panel ${smartRecommendation.severity}`} aria-label="Smart recommendation">
+            <div className="schedule-guidance-heading">
+              <div>
+                <p className="eyebrow">Smart recommendation</p>
+                <strong>{smartRecommendation.summary}</strong>
+              </div>
+              <span className={`schedule-pill ${smartRecommendation.severity}`}>{guardrailLabel(smartRecommendation)}</span>
+            </div>
+            <p>{smartRecommendation.recommendation}</p>
+            {smartRecommendation.warnings.length > 0 ? (
+              <ul className="schedule-guidance-list">
+                {smartRecommendation.warnings.slice(0, 3).map((warning) => <li key={warning}>{warning}</li>)}
+              </ul>
+            ) : null}
+          </section>
+          <label className="schedule-reason-select">
+            <span>Adjustment reason</span>
+            <select
+              aria-label="Adjustment reason"
+              value={selectedReason}
+              onChange={(event) => {
+                const nextReason = event.target.value
+                setSelectedReason(nextReason)
+                if (isMoveOpen && moveDate) {
+                  queueMicrotask(() => previewMove(moveDate))
+                }
+              }}
+            >
+              {scheduleAdjustmentReasons.map((option) => <option key={option.value || 'none'} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
           <label className="schedule-cross-train-select">
             <span>Cross-training type</span>
             <select aria-label="Cross-training type" value={crossTrainingType} onChange={(event) => setCrossTrainingType(event.target.value as CrossTrainingType)}>
               {crossTrainingOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
+          <p className="schedule-helper-copy">
+            Use cross-training for soreness or minor injury. Keep the same duration and zones when possible. Bike or elliptical work best. Cross-training does not automatically complete the workout.
+          </p>
           {isMoveOpen ? (
             <div className="schedule-move-panel">
               <label>
@@ -388,14 +458,41 @@ export function WorkoutDetailSheet({
                 <input type="date" value={moveDate} onChange={(event) => previewMove(event.target.value)} />
               </label>
               {moveResult ? (
-                <p className={`guardrail-result ${moveResult.severity}`}>
-                  <strong>{guardrailLabel(moveResult)}:</strong> {moveResult.warnings[0] ?? moveResult.recommendation}
-                </p>
+                <div className={`guardrail-result ${moveResult.severity}`}>
+                  <strong>{moveResult.warnings[0] ?? `${guardrailLabel(moveResult)}: ${moveResult.recommendation}`}</strong>
+                  {moveResult.recommendation && moveResult.recommendation !== moveResult.warnings[0] ? <p>{moveResult.recommendation}</p> : null}
+                </div>
               ) : null}
               {swapTargetWorkout ? (
                 <p className="schedule-occupied-note">
                   <strong>Occupied by:</strong> {swapTargetWorkout.name}. Swap instead?
                 </p>
+              ) : null}
+              {moveResult?.severity === 'blocked' ? (
+                <div className="schedule-safer-options" aria-label="Safer options">
+                  <strong>Safer options</strong>
+                  {moveResult.saferDateSuggestions?.length ? (
+                    <div className="schedule-safer-option-list">
+                      {moveResult.saferDateSuggestions.map((suggestion) => (
+                        <button
+                          key={`${suggestion.action}-${suggestion.date}`}
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => previewMove(suggestion.date)}
+                        >
+                          Try {suggestion.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Try another easy or rest day, or skip and continue today.</p>
+                  )}
+                  {moveResult.saferDateSuggestions?.length ? (
+                    <ul className="schedule-guidance-list compact">
+                      {moveResult.saferDateSuggestions.map((suggestion) => <li key={`why-${suggestion.action}-${suggestion.date}`}>{suggestion.label}: {suggestion.reason}</li>)}
+                    </ul>
+                  ) : null}
+                </div>
               ) : null}
               <button className="primary-button" type="button" disabled={!moveResult?.allowed || moveDate === assignedDate} onClick={saveMove}>
                 {swapTargetWorkout ? 'Swap workouts' : 'Save move'}

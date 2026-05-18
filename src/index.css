@@ -1284,6 +1284,18 @@ select:focus {
   background: rgba(66, 247, 155, 0.1);
 }
 
+.schedule-pill.caution {
+  border-color: rgba(255, 209, 92, 0.5);
+  color: #ffe7a8;
+  background: rgba(255, 209, 92, 0.12);
+}
+
+.schedule-pill.blocked {
+  border-color: rgba(255, 59, 112, 0.56);
+  color: #ffc7d4;
+  background: rgba(255, 59, 112, 0.12);
+}
+
 .schedule-pill.skipped,
 .schedule-badge.skipped {
   border-color: rgba(142, 155, 176, 0.46);
@@ -1370,12 +1382,67 @@ select:focus {
 }
 
 .schedule-cross-train-select,
+.schedule-reason-select,
 .schedule-move-panel label {
   display: grid;
   gap: 7px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 850;
+}
+
+.schedule-guidance-panel {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(66, 247, 155, 0.3);
+  border-radius: 16px;
+  background: rgba(66, 247, 155, 0.08);
+}
+
+.schedule-guidance-panel.caution {
+  border-color: rgba(255, 209, 92, 0.42);
+  background: rgba(255, 209, 92, 0.08);
+}
+
+.schedule-guidance-panel.blocked {
+  border-color: rgba(255, 59, 112, 0.44);
+  background: rgba(255, 59, 112, 0.08);
+}
+
+.schedule-guidance-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.schedule-guidance-heading strong {
+  display: block;
+  padding-top: 3px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.schedule-guidance-panel p,
+.guardrail-result p,
+.schedule-safer-options p,
+.schedule-helper-copy {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.schedule-guidance-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.schedule-guidance-list.compact {
+  padding-left: 16px;
 }
 
 .schedule-occupied-note {
@@ -1409,6 +1476,30 @@ select:focus {
   border-color: rgba(255, 59, 112, 0.56);
   color: #ffc7d4;
   background: rgba(255, 59, 112, 0.1);
+}
+
+.schedule-safer-options {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.schedule-safer-options strong {
+  font-size: 13px;
+}
+
+.schedule-safer-option-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.schedule-safer-option-list .secondary-button {
+  min-height: 38px;
+  padding-inline: 12px;
 }
 
 .month-agenda,
